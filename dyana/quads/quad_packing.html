@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quad Packing — Phi Map</title>
+  <style>
+    :root{
+      --gap:5px;
+      /* scale down to another 80% of current */
+      --card-min-h:62px;      /* 80% of 77 */
+      --card-min-w:96px;      /* 80% of 120 */
+      --shape:17px;           /* 80% of 21 */
+      --pad:5px;              /* slightly smaller padding */
+      --label-fs:11px;        /* labels stay same size */
+    }
+    *{box-sizing:border-box}
+    body{font-family:sans-serif;margin:0;padding:1rem}
+    h1{margin:0 0 .25rem 0;font-size:clamp(18px,2.5vw,28px)}
+    .row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;align-items:center}
+
+    .bin-container{display:flex;gap:1rem;align-items:flex-start}
+    .bin-side{flex:1 1 50%}
+    .bin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
+    .cell{padding:var(--gap);border-radius:8px;position:relative}
+
+    .a-bg{background:#e6ffe6}
+    .b-bg{background:#ffe4ec}
+    .a-bg::before,.b-bg::before{position:absolute;top:4px;left:6px;font-size:11px;font-weight:700;opacity:.6}
+    .a-bg::before{content:'A';color:#08660b}
+    .b-bg::before{content:'B';color:#7e1130}
+
+    .cardlet{background:#fff;border:1px solid #ccc;border-radius:10px;padding:var(--pad);text-align:center;cursor:pointer;position:relative;min-height:var(--card-min-h);min-width:var(--card-min-w);display:flex;flex-direction:column;justify-content:space-between}
+    .flipped .front{display:none}
+    .flipped .back{display:flex}
+    .front{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;flex-grow:1}
+    .back{display:none;font-size:22px;color:#aaa;align-items:center;justify-content:center;height:100%}
+
+    .pic{display:flex;gap:4px;align-items:center;justify-content:center;flex-grow:1;flex-wrap:wrap}
+    .pic.c3,.pic.c4{flex-wrap:nowrap}
+
+    .labels{display:flex;gap:6px;align-items:center;justify-content:center;margin-top:auto}
+    .bin{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:var(--label-fs)}
+    .dec{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:var(--label-fs);opacity:.8}
+    svg.shape{width:var(--shape);height:var(--shape)}
+
+    .sel-b{outline:2px solid #3b82f6;outline-offset:2px}
+    .sel-a{outline:2px solid #f59e0b;outline-offset:2px}
+    .notice{font-size:13px;color:#555}
+
+    .stats{display:flex;gap:12px;align-items:center;position:sticky;top:0;background:#fff;padding:.25rem 0;z-index:5}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:.3rem .6rem;border-radius:999px;font-weight:800;font-size:16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+    .pill .label{opacity:.7;font-weight:700}
+    .pill.up{background:#eef6ff;color:#0b5cab}
+    .pill.quads{background:#fff4e5;color:#8a4b00}
+    @keyframes flash{0%{filter:brightness(1)}50%{filter:brightness(1.35)}100%{filter:brightness(1)}}
+    .flash{animation:flash .6s ease}
+
+    .flow-banner{margin-top:.25rem;padding:.6rem .8rem;border:1px solid #f1c27d;background:#fff7e6;border-radius:10px;font-size:15px;line-height:1.35}
+    .flow-banner b{font-weight:800}
+    @keyframes glow{0%{box-shadow:0 0 0 rgba(255,165,0,0)}50%{box-shadow:0 0 0 6px rgba(255,165,0,.25)}100%{box-shadow:0 0 0 rgba(255,165,0,0)}}
+    .flow-pop{animation:glow .8s ease}
+  </style>
+</head>
+<body>
+  <h1>Quad Packing — Phi Map</h1>
+  <div id="bootStatus" class="notice" style="margin:.25rem 0;">(initializing...)</div>
+
+  <div class="stats" aria-live="polite">
+    <div class="pill up" id="pillUp"><span class="label">Face-up</span><span id="pillUpVal">0 / 64</span></div>
+    <div class="pill quads" id="pillQuads"><span class="label">Quads</span><span id="pillQuadsVal">0</span></div>
+    <div class="row" style="margin-left:auto">
+      <label>Deck:
+        <select id="deckSize">
+          <option value="64" selected>64</option>
+          <option value="32">32</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="btnSelectN">Select N random</button>
+    <input id="selectCount" type="number" value="12" min="1" max="63" />
+    <button id="btnRevealAll">Reveal all</button>
+    <button id="btnFlipAll">Flip all</button>
+  </div>
+
+  <div class="row">
+    <button id="btnStartFlow">Select Phi Map</button>
+    <button id="btnApplyFlow" disabled>Apply</button>
+    <button id="btnUndoPhi" disabled>Undo φ-map</button>
+    <button id="btnClearFlow">Clear</button>
+    <label>Partition:
+      <select id="partitionMode">
+        <option value="lr" selected>Left / Right</option>
+        <option value="tb">Top / Bottom</option>
+        <option value="rowsdbl">Double Rows</option>
+        <option value="colsdbl">Double Cols</option>
+        <option value="rowsAlt">Alternating Rows</option>
+        <option value="colsAlt">Alternating Cols</option>
+      </select>
+    </label>
+    <div id="flowInfo" class="flow-banner">Pick a face-up card for <b>b</b> from a pink (B) zone, then a face-down card for <b>a</b> from a green (A) zone.</div>
+  </div>
+
+  <div class="bin-container">
+    <div class="bin-side">
+      <h3 id="leftLabel">Left (0–31)</h3>
+      <div id="grid-left" class="bin-grid"></div>
+    </div>
+    <div class="bin-side">
+      <h3 id="rightLabel">Right (32–63)</h3>
+      <div id="grid-right" class="bin-grid"></div>
+    </div>
+  </div>
+
+<script>
+// Show boot status if anything throws
+window.addEventListener('error',(e)=>{ const bs=document.getElementById('bootStatus'); if(bs) bs.textContent='Script error: '+(e && e.message ? e.message : e); });
+
+// --- DOM & globals ---
+const gridLeft=document.getElementById('grid-left');
+const gridRight=document.getElementById('grid-right');
+let DECK=64; // 64 or 32
+const pad6=n=>n.toString(2).padStart(6,'0');
+const colOf=n=>n%8;
+
+// --- Partitions (A=green, B=pink) ---
+function isInA(n){
+  const mode=document.getElementById('partitionMode').value;
+  const c=colOf(n);
+  if(mode==='lr') return n<DECK/2; // left half is A
+  if(mode==='tb') return (n>=0&&n<=15)||(n>=32&&n<=47); // top halves if seen 8×8
+  if(mode==='rowsdbl') return (n>=0&&n<=7)||(n>=16&&n<=23)||(n>=32&&n<=39)||(n>=48&&n<=55);
+  if(mode==='colsdbl') return (c===0||c===1||c===4||c===5);
+  if(mode==='rowsAlt') return (c<=3);
+  if(mode==='colsAlt') return (c%2)===0;
+  return n<DECK/2;
+}
+const bSideContains=n=>!isInA(n);
+const aSideContains=n=>isInA(n);
+function applyZoneStyles(){
+  document.querySelectorAll('.cell').forEach(cell=>{
+    const n=+cell.dataset.index;
+    cell.classList.toggle('a-bg',isInA(n));
+    cell.classList.toggle('b-bg',!isInA(n));
+  });
+}
+
+// --- Card visuals ---
+function decodeBits(bits){
+  const colorBits=bits.slice(0,2), shapeBits=bits.slice(2,4), countBits=bits.slice(4,6);
+  const color={"00":"red","01":"green","10":"yellow","11":"blue"}[colorBits];
+  const shape={"00":"circle","01":"triangle","10":"square","11":"heart"}[shapeBits];
+  const count={"00":1,"01":2,"10":3,"11":4}[countBits];
+  return {color,shape,count};
+}
+function shapeSVG(shape,color){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','shape');
+  svg.setAttribute('viewBox','0 0 32 32');
+  let el;
+  switch(shape){
+    case 'circle': el=document.createElementNS('http://www.w3.org/2000/svg','circle'); el.setAttribute('cx','16'); el.setAttribute('cy','16'); el.setAttribute('r','12'); break;
+    case 'triangle': el=document.createElementNS('http://www.w3.org/2000/svg','polygon'); el.setAttribute('points','16,4 28,28 4,28'); break;
+    case 'square': el=document.createElementNS('http://www.w3.org/2000/svg','rect'); el.setAttribute('x','6'); el.setAttribute('y','6'); el.setAttribute('width','20'); el.setAttribute('height','20'); break;
+    case 'heart': el=document.createElementNS('http://www.w3.org/2000/svg','path'); el.setAttribute('d','M16 29s-13-7.4-13-17c0-4.4 3.6-8 8-8 3.1 0 5.9 1.8 7 4.4C19.1 5.8 21.9 4 25 4c4.4 0 8 3.6 8 8 0 9.6-13 17-13 17z'); break;
+  }
+  el.setAttribute('fill',color);
+  svg.appendChild(el);
+  return svg;
+}
+function makeFront(n){
+  const bits=pad6(n);
+  const {color,shape,count}=decodeBits(bits);
+  const front=document.createElement('div'); front.className='front';
+  const pic=document.createElement('div'); pic.className='pic';
+  if(count===3) pic.classList.add('c3');
+  if(count===4) pic.classList.add('c4');
+  for(let i=0;i<count;i++) pic.appendChild(shapeSVG(shape,color));
+  const labels=document.createElement('div'); labels.className='labels';
+  const bin=document.createElement('div'); bin.className='bin'; bin.textContent=bits;
+  const dec=document.createElement('div'); dec.className='dec'; dec.textContent=`(${n})`;
+  labels.appendChild(bin); labels.appendChild(dec);
+  front.appendChild(pic); front.appendChild(labels);
+  return front;
+}
+function makeCard(n){
+  const slot=document.createElement('div'); slot.className='cell'; slot.dataset.index=n;
+  const card=document.createElement('div'); card.className='cardlet'; card.dataset.index=n;
+  const front=makeFront(n);
+  const back=document.createElement('div'); back.className='back'; back.textContent='●';
+  card.appendChild(front); card.appendChild(back);
+  card.addEventListener('click',()=>{
+    if(flowActive){ handleCardClickForFlow(n); }
+    else { card.classList.toggle('flipped'); updateQuadInfo(); resetFlowUI('manual flip'); clearPhiUndo('manual flip'); }
+  });
+  slot.appendChild(card);
+  return slot;
+}
+
+// --- Build deck (4×8 per side) ---
+function buildDeck(){
+  gridLeft.innerHTML=''; gridRight.innerHTML='';
+  if(DECK===64){
+    for(let i=0;i<32;i++) gridLeft.appendChild(makeCard(i));
+    for(let i=32;i<64;i++) gridRight.appendChild(makeCard(i));
+    document.getElementById('leftLabel').textContent='Left (0–31)';
+    document.getElementById('rightLabel').textContent='Right (32–63)';
+  }else{ // 32-card deck: 16 per side → 4×4 each
+    for(let i=0;i<16;i++) gridLeft.appendChild(makeCard(i));
+    for(let i=16;i<32;i++) gridRight.appendChild(makeCard(i));
+    document.getElementById('leftLabel').textContent='Left (0–15)';
+    document.getElementById('rightLabel').textContent='Right (16–31)';
+  }
+  applyZoneStyles();
+  resetFlowUI('deck rebuilt');
+  clearPhiUndo('deck rebuilt');
+  updateQuadInfo();
+  const sel=document.getElementById('selectCount');
+  sel.max=String(DECK-1);
+  if(+sel.value>DECK-1) sel.value=String(Math.max(1,Math.min(12,DECK-1)));
+}
+
+// --- Helpers for flipping/selecting ---
+const allCards=()=>Array.from(document.querySelectorAll('.cardlet'));
+const getCardEl=n=>document.querySelector(`.cardlet[data-index="${n}"]`);
+const isFaceUp=n=>{ const el=getCardEl(n); return el && !el.classList.contains('flipped'); };
+const flipUp=n=>{ const el=getCardEl(n); if(el) el.classList.remove('flipped'); };
+const flipDown=n=>{ const el=getCardEl(n); if(el) el.classList.add('flipped'); };
+
+function sampleN(total,n){ n=Math.max(1,Math.min(n,total)); const s=new Set(); while(s.size<n) s.add(Math.floor(Math.random()*total)); return s; }
+function selectN(){
+  const n=parseInt(document.getElementById('selectCount').value||'0');
+  const picks=sampleN(DECK,n);
+  allCards().forEach((c,i)=>{ if(picks.has(i)) c.classList.remove('flipped'); else c.classList.add('flipped'); });
+  updateQuadInfo();
+  resetFlowUI('random select');
+  clearPhiUndo('random select');
+}
+function flipAll(state){ allCards().forEach(c=>{ if(state==='reveal') c.classList.remove('flipped'); else c.classList.add('flipped'); }); updateQuadInfo(); resetFlowUI('flip all'); clearPhiUndo('flip all'); }
+
+// --- Quad counting ---
+function computeQuads(){
+  const sel=[]; const present=new Array(DECK).fill(false);
+  allCards().forEach(c=>{ if(!c.classList.contains('flipped')) { const v=+c.dataset.index; sel.push(v); present[v]=true; } });
+  let count=0;
+  for(let i=0;i<sel.length;i++){
+    for(let j=i+1;j<sel.length;j++){
+      for(let k=j+1;k<sel.length;k++){
+        const a=sel[i], b=sel[j], c=sel[k];
+        const d=a^b^c; // fourth in a quad
+        if(d>c && d<DECK && present[d]) count++;
+      }
+    }
+  }
+  return count;
+}
+function updateQuadInfo(){
+  // face-up counter
+  let upCount = 0;
+  allCards().forEach(c => { if (!c.classList.contains('flipped')) upCount++; });
+  const pillUpVal = document.getElementById('pillUpVal');
+  if (pillUpVal) pillUpVal.textContent = `${upCount} / ${DECK}`;
+  const pillUp = document.getElementById('pillUp');
+  if (pillUp) { pillUp.classList.remove('flash'); void pillUp.offsetWidth; pillUp.classList.add('flash'); }
+
+  // quads
+  const q = computeQuads();
+  const pillQVal = document.getElementById('pillQuadsVal');
+  if (pillQVal) pillQVal.textContent = String(q);
+  const pillQ = document.getElementById('pillQuads');
+  if (pillQ) { pillQ.classList.remove('flash'); void pillQ.offsetWidth; pillQ.classList.add('flash'); }
+}
+
+// --- φ-map flow ---
+let flowActive=false; let selA=null; let selB=null;
+let lastPhi=null; // {a,b,swaps:[{from,to}], deck}
+function updateUndoState(){ const btn=document.getElementById('btnUndoPhi'); if(btn) btn.disabled = !lastPhi; }
+function clearPhiUndo(reason){ lastPhi=null; updateUndoState(); }
+const FLOW_DEFAULT = 'Pick a face-up card for b from a pink (B) zone, then a face-down card for a from a green (A) zone.';
+function resetFlowUI(reason){
+  flowActive=false; selA=null; selB=null;
+  allCards().forEach(c=>c.classList.remove('sel-b','sel-a'));
+  const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true;
+  const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent = FLOW_DEFAULT; fi.classList.remove('flow-pop'); }
+}
+function clearFlowSelections(){ flowActive=false; selA=selB=null; allCards().forEach(c=>c.classList.remove('sel-b','sel-a')); const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true; }
+function startFlow(){ flowActive=true; selA=selB=null; const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Flow active: Pick b (face-up, pink zone), then a (face-down, green zone).'; fi.classList.remove('flow-pop'); } }
+function handleCardClickForFlow(n){
+  const up=isFaceUp(n);
+  if(selB===null){
+    if(bSideContains(n) && up){ selB=n; const el=getCardEl(n); if(el) el.classList.add('sel-b'); const fi=document.getElementById('flowInfo'); if(fi) fi.textContent=`b=${n} (${pad6(n)}). Now pick a (face-down) from green A.`; }
+    else { const fi=document.getElementById('flowInfo'); if(fi) fi.textContent='b must be FACE-UP in pink B zone.'; }
+    return;
+  }
+  if(selA===null){
+    if(aSideContains(n) && !up){ selA=n; const el=getCardEl(n); if(el) el.classList.add('sel-a'); const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=false; const fi=document.getElementById('flowInfo'); if(fi) fi.textContent=`a=${n} (${pad6(n)}). Click Apply.`; }
+    else { const fi=document.getElementById('flowInfo'); if(fi) fi.textContent='a must be FACE-DOWN in green A zone.'; }
+    return;
+  }
+}
+function applyFlow(){
+  if(selA==null||selB==null) return; const a=selA, b=selB;
+  const before=computeQuads();
+  const swaps=[]; // record moves so we can undo
+  const faceUpB=[]; allCards().forEach(c=>{ const n=+c.dataset.index; if(!c.classList.contains('flipped') && bSideContains(n)) faceUpB.push(n); });
+  faceUpB.forEach(x=>{ const t=(x^a^b)&(DECK===64?63:31); if(!isFaceUp(t)){ flipDown(x); flipUp(t); swaps.push({from:x,to:t}); } });
+  const after=computeQuads();
+  const fi=document.getElementById('flowInfo'); if(fi){ fi.innerHTML = `<b>Applied φ-map</b> with <b>b=${b}</b>, <b>a=${a}</b> → <b>Quads</b>: before <b>${before}</b>, after <b>${after}</b>`; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
+  updateQuadInfo();
+  clearFlowSelections();
+  lastPhi = {a,b,swaps,deck:DECK};
+  updateUndoState();
+}
+
+
+// --- Listeners ---
+document.getElementById('btnSelectN').onclick=selectN;
+document.getElementById('btnRevealAll').onclick=()=>flipAll('reveal');
+document.getElementById('btnFlipAll').onclick=()=>flipAll('flip');
+document.getElementById('btnStartFlow').onclick=startFlow;
+document.getElementById('btnApplyFlow').onclick=applyFlow;
+document.getElementById('btnClearFlow').onclick=clearFlowSelections;
+const btnUndo=document.getElementById('btnUndoPhi'); if(btnUndo){ btnUndo.onclick=undoPhiMap; }
+document.getElementById('partitionMode').addEventListener('change', ()=>{ applyZoneStyles(); resetFlowUI('partition change'); });
+(function(){
+  const deckSel = document.getElementById('deckSize');
+  if (deckSel) {
+    deckSel.addEventListener('change', (e) => {
+      DECK = parseInt(e.target.value, 10);
+      buildDeck();
+      resetFlowUI('deck size change');
+      clearPhiUndo('deck size change');
+      const tbOpt = document.querySelector('#partitionMode option[value="tb"]');
+      if (tbOpt) {
+        tbOpt.disabled = (DECK === 32);
+        const sel = document.getElementById('partitionMode');
+        if (DECK === 32 && sel && sel.value === 'tb') { sel.value = 'lr'; applyZoneStyles(); }
+      }
+      const pillUpVal = document.getElementById('pillUpVal');
+      if (pillUpVal) pillUpVal.textContent = `0 / ${DECK}`;
+    });
+  }
+})();
+
+function undoPhiMap(){
+  if(!lastPhi) return;
+  if(lastPhi.deck!==DECK){
+    const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Cannot undo: deck size changed.'; }
+    clearPhiUndo('deck changed');
+    return;
+  }
+  lastPhi.swaps.forEach(({from,to})=>{
+    if(isFaceUp(to)) flipDown(to);
+    if(!isFaceUp(from)) flipUp(from);
+  });
+  updateQuadInfo();
+  const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Undid last φ-map.'; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
+  clearPhiUndo('undone');
+}
+
+// --- Init ---
+function init(){
+  try{
+    buildDeck();
+    flipAll('reveal');
+    const bs=document.getElementById('bootStatus');
+    if(bs) bs.textContent = 'Ready — built '+document.querySelectorAll('.cardlet').length+' cards (deck '+DECK+').';
+    const tbOpt = document.querySelector('#partitionMode option[value="tb"]');
+    if (tbOpt) tbOpt.disabled = (DECK === 32);
+    updateUndoState();
+  }catch(err){
+    const bs=document.getElementById('bootStatus');
+    if(bs) bs.textContent = 'Init error: '+ err;
+    console.error(err);
+  }
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', init);
+}else{ init(); }
+</script>
+</body>
+</html>
