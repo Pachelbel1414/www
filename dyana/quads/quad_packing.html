@@ -7,35 +7,39 @@
   <style>
     :root{
       --gap:5px;
-      /* scale down to another 80% of current */
-      --card-min-h:62px;      /* 80% of 77 */
-      --card-min-w:96px;      /* 80% of 120 */
-      --shape:17px;           /* 80% of 21 */
-      --pad:5px;              /* slightly smaller padding */
-      --label-fs:11px;        /* labels stay same size */
+      /* ~64% of original after two 80% downsizes */
+      --card-min-h:62px;
+      --card-min-w:96px;
+      --shape:17px;
+      --pad:5px;
+      --label-fs:11px; /* labels unchanged */
     }
     *{box-sizing:border-box}
     body{font-family:sans-serif;margin:0;padding:1rem}
     h1{margin:0 0 .25rem 0;font-size:clamp(18px,2.5vw,28px)}
     .row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;align-items:center}
 
+    /* Layout: two panels; each 4×8 → total 8×8 */
     .bin-container{display:flex;gap:1rem;align-items:flex-start}
     .bin-side{flex:1 1 50%}
     .bin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
     .cell{padding:var(--gap);border-radius:8px;position:relative}
 
+    /* A/B backgrounds */
     .a-bg{background:#e6ffe6}
     .b-bg{background:#ffe4ec}
     .a-bg::before,.b-bg::before{position:absolute;top:4px;left:6px;font-size:11px;font-weight:700;opacity:.6}
     .a-bg::before{content:'A';color:#08660b}
     .b-bg::before{content:'B';color:#7e1130}
 
+    /* Card visuals */
     .cardlet{background:#fff;border:1px solid #ccc;border-radius:10px;padding:var(--pad);text-align:center;cursor:pointer;position:relative;min-height:var(--card-min-h);min-width:var(--card-min-w);display:flex;flex-direction:column;justify-content:space-between}
     .flipped .front{display:none}
     .flipped .back{display:flex}
     .front{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;flex-grow:1}
     .back{display:none;font-size:22px;color:#aaa;align-items:center;justify-content:center;height:100%}
 
+    /* Shapes layout */
     .pic{display:flex;gap:4px;align-items:center;justify-content:center;flex-grow:1;flex-wrap:wrap}
     .pic.c3,.pic.c4{flex-wrap:nowrap}
 
@@ -46,8 +50,13 @@
 
     .sel-b{outline:2px solid #3b82f6;outline-offset:2px}
     .sel-a{outline:2px solid #f59e0b;outline-offset:2px}
+    /* Shadow highlight: lighter for related A targets, strong for selected a */
+    .cardlet.a-shadow{box-shadow: inset 0 0 0 2px rgba(245,158,11,.28); border-color:#f5d28f}
+    .cardlet.sel-a.a-shadow{box-shadow: inset 0 0 0 3px rgba(245,158,11,.9), 0 0 0 2px rgba(245,158,11,.55); border-color:#f59e0b}
+
     .notice{font-size:13px;color:#555}
 
+    /* Stats */
     .stats{display:flex;gap:12px;align-items:center;position:sticky;top:0;background:#fff;padding:.25rem 0;z-index:5}
     .pill{display:inline-flex;align-items:center;gap:8px;padding:.3rem .6rem;border-radius:999px;font-weight:800;font-size:16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
     .pill .label{opacity:.7;font-weight:700}
@@ -116,7 +125,7 @@
   </div>
 
 <script>
-// Show boot status if anything throws
+// Show errors in-line
 window.addEventListener('error',(e)=>{ const bs=document.getElementById('bootStatus'); if(bs) bs.textContent='Script error: '+(e && e.message ? e.message : e); });
 
 // --- DOM & globals ---
@@ -126,12 +135,19 @@ let DECK=64; // 64 or 32
 const pad6=n=>n.toString(2).padStart(6,'0');
 const colOf=n=>n%8;
 
-// --- Partitions (A=green, B=pink) ---
+// Flow state & undo
+let flowActive=false; let selA=null; let selB=null;
+let lastPhi=null; // {a,b,swaps:[{from,to}], deck}
+const FLOW_DEFAULT='Pick a face-up card for b from a pink (B) zone, then a face-down card for a from a green (A) zone.';
+function updateUndoState(){ const btn=document.getElementById('btnUndoPhi'); if(btn) btn.disabled=!lastPhi; }
+function clearPhiUndo(){ lastPhi=null; updateUndoState(); }
+
+// Partitions (A=green, B=pink)
 function isInA(n){
   const mode=document.getElementById('partitionMode').value;
   const c=colOf(n);
-  if(mode==='lr') return n<DECK/2; // left half is A
-  if(mode==='tb') return (n>=0&&n<=15)||(n>=32&&n<=47); // top halves if seen 8×8
+  if(mode==='lr') return n<DECK/2;
+  if(mode==='tb') return (n>=0&&n<=15)||(n>=32&&n<=47);
   if(mode==='rowsdbl') return (n>=0&&n<=7)||(n>=16&&n<=23)||(n>=32&&n<=39)||(n>=48&&n<=55);
   if(mode==='colsdbl') return (c===0||c===1||c===4||c===5);
   if(mode==='rowsAlt') return (c<=3);
@@ -148,7 +164,7 @@ function applyZoneStyles(){
   });
 }
 
-// --- Card visuals ---
+// Card visuals
 function decodeBits(bits){
   const colorBits=bits.slice(0,2), shapeBits=bits.slice(2,4), countBits=bits.slice(4,6);
   const color={"00":"red","01":"green","10":"yellow","11":"blue"}[colorBits];
@@ -194,13 +210,13 @@ function makeCard(n){
   card.appendChild(front); card.appendChild(back);
   card.addEventListener('click',()=>{
     if(flowActive){ handleCardClickForFlow(n); }
-    else { card.classList.toggle('flipped'); updateQuadInfo(); resetFlowUI('manual flip'); clearPhiUndo('manual flip'); }
+    else { card.classList.toggle('flipped'); updateQuadInfo(); resetFlowUI('manual flip'); clearPhiUndo(); }
   });
   slot.appendChild(card);
   return slot;
 }
 
-// --- Build deck (4×8 per side) ---
+// Build deck (4×8 per side)
 function buildDeck(){
   gridLeft.innerHTML=''; gridRight.innerHTML='';
   if(DECK===64){
@@ -216,14 +232,13 @@ function buildDeck(){
   }
   applyZoneStyles();
   resetFlowUI('deck rebuilt');
-  clearPhiUndo('deck rebuilt');
   updateQuadInfo();
   const sel=document.getElementById('selectCount');
   sel.max=String(DECK-1);
   if(+sel.value>DECK-1) sel.value=String(Math.max(1,Math.min(12,DECK-1)));
 }
 
-// --- Helpers for flipping/selecting ---
+// Helpers for flipping/selecting
 const allCards=()=>Array.from(document.querySelectorAll('.cardlet'));
 const getCardEl=n=>document.querySelector(`.cardlet[data-index="${n}"]`);
 const isFaceUp=n=>{ const el=getCardEl(n); return el && !el.classList.contains('flipped'); };
@@ -237,11 +252,16 @@ function selectN(){
   allCards().forEach((c,i)=>{ if(picks.has(i)) c.classList.remove('flipped'); else c.classList.add('flipped'); });
   updateQuadInfo();
   resetFlowUI('random select');
-  clearPhiUndo('random select');
+  clearPhiUndo();
 }
-function flipAll(state){ allCards().forEach(c=>{ if(state==='reveal') c.classList.remove('flipped'); else c.classList.add('flipped'); }); updateQuadInfo(); resetFlowUI('flip all'); clearPhiUndo('flip all'); }
+function flipAll(state){
+  allCards().forEach(c=>{ if(state==='reveal') c.classList.remove('flipped'); else c.classList.add('flipped'); });
+  updateQuadInfo();
+  resetFlowUI('flip all');
+  clearPhiUndo();
+}
 
-// --- Quad counting ---
+// Quad counting
 function computeQuads(){
   const sel=[]; const present=new Array(DECK).fill(false);
   allCards().forEach(c=>{ if(!c.classList.contains('flipped')) { const v=+c.dataset.index; sel.push(v); present[v]=true; } });
@@ -258,46 +278,46 @@ function computeQuads(){
   return count;
 }
 function updateQuadInfo(){
-  // face-up counter
-  let upCount = 0;
-  allCards().forEach(c => { if (!c.classList.contains('flipped')) upCount++; });
-  const pillUpVal = document.getElementById('pillUpVal');
-  if (pillUpVal) pillUpVal.textContent = `${upCount} / ${DECK}`;
-  const pillUp = document.getElementById('pillUp');
-  if (pillUp) { pillUp.classList.remove('flash'); void pillUp.offsetWidth; pillUp.classList.add('flash'); }
-
-  // quads
-  const q = computeQuads();
-  const pillQVal = document.getElementById('pillQuadsVal');
-  if (pillQVal) pillQVal.textContent = String(q);
-  const pillQ = document.getElementById('pillQuads');
-  if (pillQ) { pillQ.classList.remove('flash'); void pillQ.offsetWidth; pillQ.classList.add('flash'); }
+  let upCount=0; allCards().forEach(c=>{ if(!c.classList.contains('flipped')) upCount++; });
+  const pillUpVal=document.getElementById('pillUpVal'); if(pillUpVal) pillUpVal.textContent=`${upCount} / ${DECK}`;
+  const pillUp=document.getElementById('pillUp'); if(pillUp){ pillUp.classList.remove('flash'); void pillUp.offsetWidth; pillUp.classList.add('flash'); }
+  const q=computeQuads(); const pillQVal=document.getElementById('pillQuadsVal'); if(pillQVal) pillQVal.textContent=String(q);
+  const pillQ=document.getElementById('pillQuads'); if(pillQ){ pillQ.classList.remove('flash'); void pillQ.offsetWidth; pillQ.classList.add('flash'); }
 }
 
-// --- φ-map flow ---
-let flowActive=false; let selA=null; let selB=null;
-let lastPhi=null; // {a,b,swaps:[{from,to}], deck}
-function updateUndoState(){ const btn=document.getElementById('btnUndoPhi'); if(btn) btn.disabled = !lastPhi; }
-function clearPhiUndo(reason){ lastPhi=null; updateUndoState(); }
-const FLOW_DEFAULT = 'Pick a face-up card for b from a pink (B) zone, then a face-down card for a from a green (A) zone.';
-function resetFlowUI(reason){
+// Highlight helpers for A-targets
+function clearAShadowHighlights(){ allCards().forEach(c=>c.classList.remove('a-shadow')); }
+function updateAShadowHighlights(){
+  clearAShadowHighlights();
+  if(selA==null || selB==null) return; // only after both picked
+  const a=selA, b=selB;
+  const faceUpB=[];
+  allCards().forEach(c=>{ const n=+c.dataset.index; if(!c.classList.contains('flipped') && bSideContains(n)) faceUpB.push(n); });
+  faceUpB.forEach(x=>{ const t=(x^a^b)&(DECK===64?63:31); const el=getCardEl(t); if(el) el.classList.add('a-shadow'); });
+  const el=getCardEl(selA); if(el) el.classList.add('sel-a');
+}
+
+// φ-map flow
+function resetFlowUI(){
   flowActive=false; selA=null; selB=null;
-  allCards().forEach(c=>c.classList.remove('sel-b','sel-a'));
+  allCards().forEach(c=>c.classList.remove('sel-b','sel-a','a-shadow'));
   const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true;
-  const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent = FLOW_DEFAULT; fi.classList.remove('flow-pop'); }
+  const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent=FLOW_DEFAULT; fi.classList.remove('flow-pop'); }
 }
-function clearFlowSelections(){ flowActive=false; selA=selB=null; allCards().forEach(c=>c.classList.remove('sel-b','sel-a')); const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true; }
+function clearFlowSelections(){ resetFlowUI(); }
 function startFlow(){ flowActive=true; selA=selB=null; const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Flow active: Pick b (face-up, pink zone), then a (face-down, green zone).'; fi.classList.remove('flow-pop'); } }
 function handleCardClickForFlow(n){
   const up=isFaceUp(n);
   if(selB===null){
     if(bSideContains(n) && up){ selB=n; const el=getCardEl(n); if(el) el.classList.add('sel-b'); const fi=document.getElementById('flowInfo'); if(fi) fi.textContent=`b=${n} (${pad6(n)}). Now pick a (face-down) from green A.`; }
     else { const fi=document.getElementById('flowInfo'); if(fi) fi.textContent='b must be FACE-UP in pink B zone.'; }
+    updateAShadowHighlights();
     return;
   }
   if(selA===null){
     if(aSideContains(n) && !up){ selA=n; const el=getCardEl(n); if(el) el.classList.add('sel-a'); const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=false; const fi=document.getElementById('flowInfo'); if(fi) fi.textContent=`a=${n} (${pad6(n)}). Click Apply.`; }
     else { const fi=document.getElementById('flowInfo'); if(fi) fi.textContent='a must be FACE-DOWN in green A zone.'; }
+    updateAShadowHighlights();
     return;
   }
 }
@@ -308,78 +328,56 @@ function applyFlow(){
   const faceUpB=[]; allCards().forEach(c=>{ const n=+c.dataset.index; if(!c.classList.contains('flipped') && bSideContains(n)) faceUpB.push(n); });
   faceUpB.forEach(x=>{ const t=(x^a^b)&(DECK===64?63:31); if(!isFaceUp(t)){ flipDown(x); flipUp(t); swaps.push({from:x,to:t}); } });
   const after=computeQuads();
-  const fi=document.getElementById('flowInfo'); if(fi){ fi.innerHTML = `<b>Applied φ-map</b> with <b>b=${b}</b>, <b>a=${a}</b> → <b>Quads</b>: before <b>${before}</b>, after <b>${after}</b>`; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
+  const fi=document.getElementById('flowInfo'); if(fi){ fi.innerHTML=`<b>Applied φ-map</b> with <b>b=${b}</b>, <b>a=${a}</b> → <b>Quads</b>: before <b>${before}</b>, after <b>${after}</b>`; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
   updateQuadInfo();
   clearFlowSelections();
-  lastPhi = {a,b,swaps,deck:DECK};
+  clearAShadowHighlights();
+  lastPhi={a,b,swaps,deck:DECK};
   updateUndoState();
 }
-
-
-// --- Listeners ---
-document.getElementById('btnSelectN').onclick=selectN;
-document.getElementById('btnRevealAll').onclick=()=>flipAll('reveal');
-document.getElementById('btnFlipAll').onclick=()=>flipAll('flip');
-document.getElementById('btnStartFlow').onclick=startFlow;
-document.getElementById('btnApplyFlow').onclick=applyFlow;
-document.getElementById('btnClearFlow').onclick=clearFlowSelections;
-const btnUndo=document.getElementById('btnUndoPhi'); if(btnUndo){ btnUndo.onclick=undoPhiMap; }
-document.getElementById('partitionMode').addEventListener('change', ()=>{ applyZoneStyles(); resetFlowUI('partition change'); });
-(function(){
-  const deckSel = document.getElementById('deckSize');
-  if (deckSel) {
-    deckSel.addEventListener('change', (e) => {
-      DECK = parseInt(e.target.value, 10);
-      buildDeck();
-      resetFlowUI('deck size change');
-      clearPhiUndo('deck size change');
-      const tbOpt = document.querySelector('#partitionMode option[value="tb"]');
-      if (tbOpt) {
-        tbOpt.disabled = (DECK === 32);
-        const sel = document.getElementById('partitionMode');
-        if (DECK === 32 && sel && sel.value === 'tb') { sel.value = 'lr'; applyZoneStyles(); }
-      }
-      const pillUpVal = document.getElementById('pillUpVal');
-      if (pillUpVal) pillUpVal.textContent = `0 / ${DECK}`;
-    });
-  }
-})();
-
 function undoPhiMap(){
   if(!lastPhi) return;
-  if(lastPhi.deck!==DECK){
-    const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Cannot undo: deck size changed.'; }
-    clearPhiUndo('deck changed');
-    return;
-  }
-  lastPhi.swaps.forEach(({from,to})=>{
-    if(isFaceUp(to)) flipDown(to);
-    if(!isFaceUp(from)) flipUp(from);
-  });
+  if(lastPhi.deck!==DECK){ const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Cannot undo: deck size changed.'; } clearPhiUndo(); return; }
+  lastPhi.swaps.forEach(({from,to})=>{ if(isFaceUp(to)) flipDown(to); if(!isFaceUp(from)) flipUp(from); });
   updateQuadInfo();
   const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Undid last φ-map.'; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
-  clearPhiUndo('undone');
+  clearPhiUndo();
 }
 
-// --- Init ---
+// Listeners
+ document.getElementById('btnSelectN').onclick=selectN;
+ document.getElementById('btnRevealAll').onclick=()=>flipAll('reveal');
+ document.getElementById('btnFlipAll').onclick=()=>flipAll('flip');
+ document.getElementById('btnStartFlow').onclick=startFlow;
+ document.getElementById('btnApplyFlow').onclick=applyFlow;
+ document.getElementById('btnClearFlow').onclick=clearFlowSelections;
+ const btnUndo=document.getElementById('btnUndoPhi'); if(btnUndo){ btnUndo.onclick=undoPhiMap; }
+ document.getElementById('partitionMode').addEventListener('change',()=>{ applyZoneStyles(); resetFlowUI('partition change'); clearPhiUndo(); });
+ (function(){
+  const deckSel=document.getElementById('deckSize');
+  if(deckSel){
+    deckSel.addEventListener('change',(e)=>{
+      DECK=parseInt(e.target.value,10);
+      buildDeck();
+      const tbOpt=document.querySelector('#partitionMode option[value="tb"]');
+      if(tbOpt){ tbOpt.disabled=(DECK===32); const sel=document.getElementById('partitionMode'); if(DECK===32 && sel && sel.value==='tb'){ sel.value='lr'; applyZoneStyles(); } }
+      const pillUpVal=document.getElementById('pillUpVal'); if(pillUpVal) pillUpVal.textContent=`0 / ${DECK}`;
+      resetFlowUI('deck size change'); clearPhiUndo();
+    });
+  }
+ })();
+
+// Init
 function init(){
   try{
     buildDeck();
     flipAll('reveal');
-    const bs=document.getElementById('bootStatus');
-    if(bs) bs.textContent = 'Ready — built '+document.querySelectorAll('.cardlet').length+' cards (deck '+DECK+').';
-    const tbOpt = document.querySelector('#partitionMode option[value="tb"]');
-    if (tbOpt) tbOpt.disabled = (DECK === 32);
+    const bs=document.getElementById('bootStatus'); if(bs) bs.textContent='Ready — built '+document.querySelectorAll('.cardlet').length+' cards (deck '+DECK+').';
+    const tbOpt=document.querySelector('#partitionMode option[value="tb"]'); if(tbOpt) tbOpt.disabled=(DECK===32);
     updateUndoState();
-  }catch(err){
-    const bs=document.getElementById('bootStatus');
-    if(bs) bs.textContent = 'Init error: '+ err;
-    console.error(err);
-  }
+  }catch(err){ const bs=document.getElementById('bootStatus'); if(bs) bs.textContent='Init error: '+err; console.error(err); }
 }
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded', init);
-}else{ init(); }
+if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 </script>
 </body>
 </html>
