@@ -304,7 +304,12 @@ function resetFlowUI(){
   const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true;
   const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent=FLOW_DEFAULT; fi.classList.remove('flow-pop'); }
 }
-function clearFlowSelections(){ resetFlowUI(); }
+function clearFlowSelections(keepBanner=false){
+  flowActive=false; selA=null; selB=null;
+  allCards().forEach(c=>c.classList.remove('sel-b','sel-a','a-shadow'));
+  const btn=document.getElementById('btnApplyFlow'); if(btn) btn.disabled=true;
+  if(!keepBanner){ const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent=FLOW_DEFAULT; fi.classList.remove('flow-pop'); } }
+}
 function startFlow(){ flowActive=true; selA=selB=null; const fi=document.getElementById('flowInfo'); if(fi){ fi.textContent='Flow active: Pick b (face-up, pink zone), then a (face-down, green zone).'; fi.classList.remove('flow-pop'); } }
 function handleCardClickForFlow(n){
   const up=isFaceUp(n);
@@ -330,7 +335,7 @@ function applyFlow(){
   const after=computeQuads();
   const fi=document.getElementById('flowInfo'); if(fi){ fi.innerHTML=`<b>Applied φ-map</b> with <b>b=${b}</b>, <b>a=${a}</b> → <b>Quads</b>: before <b>${before}</b>, after <b>${after}</b>`; fi.classList.remove('flow-pop'); void fi.offsetWidth; fi.classList.add('flow-pop'); }
   updateQuadInfo();
-  clearFlowSelections();
+  clearFlowSelections(true); // keep the banner showing before/after quads until state changes
   clearAShadowHighlights();
   lastPhi={a,b,swaps,deck:DECK};
   updateUndoState();
