@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quads — Tabs App</title>
+  <title>Quads — Smart Basis Suggest</title>
   <style>
     :root{ --bg:#fafafa; --ink:#111; --muted:#6b7280; --brand:#2563eb; --gold:#b45309; --purple:#6d28d9; --border:#e5e7eb; --card:#fff; --card-w: 100px; }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .app{max-width:1100px;margin:0 auto;padding:16px}
     h1{margin:0 0 8px 0;font-size:20px}
-    .status{color:var(--muted);font-size:13px;margin-bottom:8px}
-    .tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:12px}
+    .status{color:var(--muted);font-size:13px;margin-bottom:8px; min-height: 18px;}
+    .tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:12px;flex-wrap:wrap}
     .tab-btn{appearance:none;border:0;background:transparent;padding:10px 14px;border-bottom:2px solid transparent;font-weight:700;color:var(--muted);cursor:pointer;border-radius:8px 8px 0 0}
     .tab-btn[aria-selected="true"]{color:var(--brand);border-color:var(--brand);background:#fff}
     .tab-panel{display:none}
@@ -30,23 +30,15 @@
     .grid.single4x4{grid-template-columns:repeat(4, var(--card-w)); justify-content:center}
     .cell{border-radius:10px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:10px;height:60px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer;width:var(--card-w)}
-    .front{display:none}
+    /* FRONT hidden unless face-up */
+    .front{display:none !important; justify-content:center; width:100%;}
+    .card.faceup .front{display:flex !important}
     .back{display:flex;align-items:center;justify-content:center;flex:1;color:#9ca3af}
-    .card.faceup .front{display:flex}
     .card.faceup .back{display:none}
     .labels{display:none}
-    .pic {
-  display: grid;
-  grid-auto-flow: column;     /* lay items left→right */
-  grid-auto-columns: auto;    /* one auto-width track per shape */
-  justify-content: center;    /* center the whole row of shapes */
-  justify-items: center;      /* center each shape in its track */
-  gap: 4px;
-  align-items: center;
-  width: 100%;
-.front { display: flex; justify-content: center; width: 100%; }
-}
+    .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; justify-content:center; justify-items:center; gap:4px; align-items:center; width:100%; }
     svg.shape{width:16px;height:16px}
+
     /* Basis/Layout */
     .pile{display:flex;flex-wrap:wrap;gap:8px;min-height:124px;padding:8px;border:1px dashed var(--border);border-radius:12px;background:#fff}
     .bin-container{display:flex;gap:16px;align-items:flex-start;margin-top:10px}
@@ -56,60 +48,42 @@
     .badge.basis{border-color:#c7d2fe;background:#eef2ff}
     .drop-ok{outline:3px solid var(--brand);outline-offset:2px}
     .backcard{background:var(--card);border:1px solid var(--border);border-radius:10px;height:60px;display:flex;align-items:center;justify-content:center;color:#9ca3af;width:var(--card-w)}
-    /* Suggested highlight */
     .suggested{ box-shadow: inset 0 0 0 3px var(--brand); }
+
     /* Phi map */
     .phiCell{cursor:pointer}
     .phiA{outline:2px solid rgba(217,119,6,0.35); outline-offset:2px; box-shadow:0 0 0 2px rgba(217,119,6,0.10)}
     .phiB{outline:2px solid rgba(124,58,237,0.35); outline-offset:2px; box-shadow:0 0 0 2px rgba(124,58,237,0.10)}
     .phiSelectedA{outline:3px solid #b45309 !important; box-shadow:0 0 10px 4px rgba(180,83,9,0.45) !important; border-radius:12px}
     .phiSelectedB{outline:3px solid #6d28d9 !important; box-shadow:0 0 10px 4px rgba(109,40,217,0.45) !important; border-radius:12px}
-    .a-shadow{outline:3px solid rgba(217,119,6,0.7); outline-offset:2px; box-shadow:0 0 0 3px rgba(217,119,6,0.18)}
- /* 50% size for cards that are in the Selected Pile */
-.pile .card {
-  width: calc(var(--card-w) * 0.5);   /* 100px → 50px by default */
-  height: 30px;                        /* 60px → 30px */
-}
+    .a-shadow{outline:3px solid rgba(217,119,6,0.7); outline-offset:2px; box-shadow:0 0 0 3px rgba(217,119,0,0.18)}
 
-/* If placeholders/back faces ever appear in the pile, size them too */
-.pile .backcard {
-  width: calc(var(--card-w) * 0.5);
-  height: 30px;
-}
+    /* 50% size for cards in the Selected Pile */
+    .pile .card { width: calc(var(--card-w) * 0.5); height: 30px; }
+    .pile .backcard { width: calc(var(--card-w) * 0.5); height: 30px; }
+    .pile svg.shape { width: 10px; height: 10px; }
+    .pile .pic { gap: 1px; }
 
-/* Scale down the shapes inside the card for better fit */
-.pile svg.shape {
-  width: 10px;   /* 16px → 12px */
-  height: 10px;
-}
-
-/* Optional: slightly tighter spacing between shapes in the pile */
-.pile .pic {
-  gap: 1px;
-}
- 
-
-
-
-
-/* --- Single ring around the Random-N controls --- */
-@media (max-width: 520px){
-  }
-
-/* --- Single ring around the Basis/Layout controls --- */
-@media (max-width: 520px){
-  }
-</style>
+    /* --- Find Quads --- */
+    .card.selected { outline:3px solid var(--brand); outline-offset:2px; }
+    .found-wrap { display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
+    .found-quad { display:flex; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:center; }
+    .mini { width: calc(var(--card-w) * 0.5); height: 30px; border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; }
+    .mini .front { display:flex !important; } /* minis always show */
+    .mini svg.shape { width:10px; height:10px; }
+    .mini .pic { gap: 1px; }
+  </style>
 </head>
 <body>
   <div class="app">
-    <h1>Quads — New App (Tabs)</h1>
+    <h1>Quads — App</h1>
     <div id="status" class="status">(initializing…)</div>
 
     <div role="tablist" aria-label="Quads tabs" class="tabs">
       <button class="tab-btn" role="tab" id="tab-select" aria-controls="panel-select" aria-selected="true">Select Cards</button>
       <button class="tab-btn" role="tab" id="tab-layout" aria-controls="panel-layout" aria-selected="false">Basis / Layout</button>
       <button class="tab-btn" role="tab" id="tab-phi" aria-controls="panel-phi" aria-selected="false">Phi Map</button>
+      <button class="tab-btn" role="tab" id="tab-find" aria-controls="panel-find" aria-selected="false">Find Quads</button>
     </div>
 
     <!-- Select Cards Panel -->
@@ -125,8 +99,6 @@
         <span class="pill"><span class="muted">Quads</span> <strong id="selectQuadCount">0</strong></span>
       </div>
       <div class="row">
-        
-        
         <span id="randomGroup" class="pill"><label for="nCount">Random N</label>
         <input id="nCount" type="number" value="12" min="1" max="64" />
         <button id="randomN">Apply</button></span>
@@ -147,19 +119,16 @@
 
     <!-- Basis/Layout -->
     <section id="panel-layout" class="tab-panel" role="tabpanel" aria-labelledby="tab-layout" aria-hidden="true">
-      <div class="row"><span id="basisGroup" class="pill"><button id="basisStartNew" class="primary">Choose new basis</button><button id="basisSuggest0">Suggest 0</button><button id="basisSuggestNext">Suggest next</button>
-          <div class="basis-msg"><span id="basisSuggest0Msg" class="muted"></span><span id="basisSuggestNextMsg" class="muted"></span><span id="basisResetMsg" class="muted"></span></div>
+      <div class="row"><span id="basisGroup" class="pill">
+        <button id="basisStartNew" class="primary">Create new basis</button>
+        <button id="basisSuggest0">Suggest 0</button>
+        <button id="basisSuggestNext">Suggest next</button>
+        <div class="basis-msg"><span id="basisSuggest0Msg" class="muted"></span><span id="basisSuggestNextMsg" class="muted"></span><span id="basisResetMsg" class="muted"></span></div>
         </span>
         <button id="basisResetLayout">Return to Standard Layout</button>
-        
-         <span class="pill"><span class="muted">Face-up</span> <strong id="basisUpCount">0</strong></span>
+        <span class="pill"><span class="muted">Face-up</span> <strong id="basisUpCount">0</strong></span>
         <span class="pill"><span class="muted">Quads</span> <strong id="basisQuadCount">0</strong></span>
-        
-        
-        
-         
-        
-        </div>
+      </div>
 
       <h3>Selected Pile</h3>
       <div id="basisPile" class="pile"></div>
@@ -185,10 +154,6 @@
           </select>
         </span>
         <span id="phiActionPill" class="pill"><button id="phiStart" class="primary">Select Phi Map</button><button id="phiUndo">Undo φ-map</button><button id="phiApply">Apply</button><button id="phiClearSel">Clear</button></span>
-        
-        
-        
-        
         <span class="pill"><span class="muted">Quads before</span> <strong id="phiQuadBefore">0</strong></span>
         <span class="pill"><span class="muted">Quads after</span> <strong id="phiQuadAfter"></strong></span></div>
       <div id="phiInfo" class="muted" style="margin:.25rem 0;">Pick a face-up card for <b>b</b> from a purple (B) zone, then a face-down card for <b>a</b> from a gold (A) zone.</div>
@@ -199,6 +164,30 @@
         <div class="bin-divider"></div>
         <div class="bin-side"><div id="phi-grid-right" class="grid"></div></div>
       </div>
+    </section>
+
+    <!-- Find Quads -->
+    <section id="panel-find" class="tab-panel" role="tabpanel" aria-labelledby="tab-find" aria-hidden="true">
+      <div class="row">
+        <span class="pill"><span class="muted">Total quads (face-up)</span> <strong id="findTotalQuads">0</strong></span>
+        <span class="pill"><span class="muted">Found</span> <strong id="findFoundCount">0 / 20</strong></span>
+        <span class="pill">
+          <button id="findClearSel">Clear selection</button>
+          <button id="findResetList">Reset found list</button>
+        </span>
+      </div>
+
+      <div id="findMsg" class="status"></div>
+
+      <h3 id="findGridTitle">Find Quads Grid</h3>
+      <div class="bin-container">
+        <div class="bin-side"><div id="find-grid-left" class="grid"></div></div>
+        <div class="bin-divider"></div>
+        <div class="bin-side"><div id="find-grid-right" class="grid"></div></div>
+      </div>
+
+      <h3 style="margin-top:12px;">Found Quads</h3>
+      <div id="foundQuadsWrap" class="found-wrap"></div>
     </section>
   </div>
 
@@ -225,14 +214,9 @@ function shapeSVG(shape,color){
 
 // ---------- Global state ----------
 var DECK=64;
-var statusEl = byId('status');
-var deckSel = byId('deckSize');
-var upCountEl = byId('upCount');
-var gridL = byId('grid-left');
-var gridR = byId('grid-right');
-var leftLabel = byId('leftLabel');
-var rightLabel = byId('rightLabel');
+var statusEl, deckSel, upCountEl, gridL, gridR;
 
+// Select tab helpers
 function allCards(){ return Array.prototype.slice.call(document.querySelectorAll('#grid-left .card, #grid-right .card')); }
 function getCardEl(n){ return document.querySelector('#grid-left .card[data-index="'+n+'"], #grid-right .card[data-index="'+n+'"]'); }
 function isFaceUp(n){ var el=getCardEl(n); return !!(el && el.classList.contains('faceup')); }
@@ -243,7 +227,7 @@ function getSelectedIndices(){ var out=[]; var cards=allCards(); for(var i=0;i<c
 function computeQuadsBasic(indices){
   var seen={}, uniq=[]; for(var i=0;i<indices.length;i++){ var v=indices[i]; if(!seen[v]){ seen[v]=1; uniq.push(v); } }
   uniq.sort(function(a,b){return a-b;});
-  var present={}; for(var u=0; u<uniq.length; u++) present[uniq[u]] = 1; // FIXED: proper loop condition
+  var present={}; for(var u=0; u<uniq.length; u++) present[uniq[u]] = 1;
   var cnt=0;
   for(var i1=0;i1<uniq.length;i1++){
     for(var j1=i1+1;j1<uniq.length;j1++){
@@ -258,8 +242,9 @@ function computeQuadsBasic(indices){
 
 function updateUpCount(){
   var up=getFaceUpCount();
-  upCountEl.textContent = up + ' / ' + DECK;
+  if (upCountEl) upCountEl.textContent = up + ' / ' + DECK;
   var qEl = byId('selectQuadCount'); if(qEl){ qEl.textContent = String(computeQuadsBasic(getSelectedIndices())); }
+  if (typeof find!=='undefined' && find.initialized) { updateFindCounts(); }
 }
 function makeFront(n){
   var bits=pad6(n), d=decodeBits(bits);
@@ -276,7 +261,7 @@ function makeCard(n){
   var front=makeFront(n);
   var back=document.createElement('div'); back.className='back'; back.textContent='●';
   card.appendChild(front); card.appendChild(back);
-  card.addEventListener('click', function(){ card.classList.toggle('faceup'); updateUpCount(); updateDownstreamCounts(); });
+  card.addEventListener('click', function(){ card.classList.toggle('faceup'); updateUpCount(); updateDownstreamCounts(); buildPhiGridIfInit(); buildFindGridIfInit(); });
   cell.appendChild(card); return cell;
 }
 function buildDeck(){
@@ -292,56 +277,110 @@ function updateDownstreamCounts(){
   var basisUp = byId('basisUpCount'); if(basisUp) basisUp.textContent = String(getFaceUpCount());
   var basisQ  = byId('basisQuadCount'); if(basisQ)  basisQ.textContent  = String(computeQuadsBasic(getSelectedIndices()));
   var phiBefore = byId('phiQuadBefore'); if(phiBefore && (typeof phi === 'undefined' || !phi || !phi.lastPhi)) phiBefore.textContent = String(computeQuadsBasic(getSelectedIndices()));
+  var findTotalEl = byId('findTotalQuads'); if(findTotalEl){ findTotalEl.textContent = String(computeQuadsBasic(getSelectedIndices())); }
 }
 
 function wireSelectControls(){
   var reveal=byId('revealAll'), hide=byId('hideAll'), rnd=byId('randomN');
-  if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); });
-  if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); });
-  if(rnd) rnd.addEventListener('click', function(){ var n=parseInt(byId('nCount').value||'0',10); if(isNaN(n)||n<1) n=1; if(n>DECK) n=DECK; var picks=[]; var set={}; while(picks.length<n){ var r=Math.floor(Math.random()*DECK); if(!set[r]){ set[r]=1; picks.push(r);} } var cards=allCards(); for(var i=0;i<cards.length;i++){ if(picks.indexOf(i)!==-1) cards[i].classList.add('faceup'); else cards[i].classList.remove('faceup'); } updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); });
-  deckSel.addEventListener('change', function(e){ DECK=parseInt(e.target.value,10); buildDeck(); basis.mappingComplete=false; basis.locked=false; basis.pos2val=null; basis.lockedPos2val=null; refreshIfOnLayout(); buildPhiGridIfInit(); updatePartitionDisables(); });
+  if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(rnd) rnd.addEventListener('click', function(){ var n=parseInt(byId('nCount').value||'0',10); if(isNaN(n)||n<1) n=1; if(n>DECK) n=DECK; var picks=[]; var set={}; while(picks.length<n){ var r=Math.floor(Math.random()*DECK); if(!set[r]){ set[r]=1; picks.push(r);} } var cards=allCards(); for(var i=0;i<cards.length;i++){ if(picks.indexOf(i)!==-1) cards[i].classList.add('faceup'); else cards[i].classList.remove('faceup'); } updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  deckSel.addEventListener('change', function(e){ DECK=parseInt(e.target.value,10); buildDeck(); basis.mappingComplete=false; basis.locked=false; basis.pos2val=null; basis.lockedPos2val=null; refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); updatePartitionDisables(); });
 }
 
 // Tabs
-var tabs=[{btn:byId('tab-select'),panel:byId('panel-select')},{btn:byId('tab-layout'),panel:byId('panel-layout')},{btn:byId('tab-phi'),panel:byId('panel-phi')}];
-for(var t=0;t<tabs.length;t++){
-  (function(T){ T.btn.addEventListener('click', function(){ for(var k=0;k<tabs.length;k++){ var B=tabs[k]; B.btn.setAttribute('aria-selected', String(B===T)); B.panel.setAttribute('aria-hidden', String(B.panel!==T.panel)); }
-    if(T.btn.id==='tab-layout'){ if(!basis.pile) initBasisTab(); else refreshBasisEverything(); }
-    if(T.btn.id==='tab-phi'){ if(!phi.initialized) initPhiTab(); else buildPhiGrid(); }
-  }); })(tabs[t]);
+var tabs=[];
+function activateTab(tabId){
+  for(var k=0;k<tabs.length;k++){
+    var B=tabs[k];
+    var selected = (B.btn.id===tabId);
+    B.btn.setAttribute('aria-selected', String(selected));
+    B.panel.setAttribute('aria-hidden', String(!selected));
+  }
+  if(tabId==='tab-layout'){ ensureInitBasisTab(); refreshBasisEverything(); }
+  if(tabId==='tab-phi'){ if(!phi.initialized) initPhiTab(); else buildPhiGrid(); }
+  if(tabId==='tab-find'){ if(!find.initialized) initFindTab(); else buildFindGrid(); }
 }
 
 // Boot
-function init(){ try{ if(!deckSel) throw new Error('Missing Select tab markup.'); DECK=parseInt(deckSel.value,10); buildDeck(); wireSelectControls(); statusEl.textContent='Ready'; } catch(err){ statusEl.textContent='Init error: '+err.message; console.error(err); } }
+function init(){
+  try{
+    statusEl = byId('status');
+    deckSel  = byId('deckSize');
+    upCountEl= byId('upCount');
+    gridL    = byId('grid-left');
+    gridR    = byId('grid-right');
+
+    if(!deckSel || !gridL || !gridR){
+      throw new Error('Missing Select tab markup.');
+    }
+    DECK = parseInt(deckSel.value, 10) || 64;
+
+    tabs=[
+      {btn:byId('tab-select'),panel:byId('panel-select')},
+      {btn:byId('tab-layout'),panel:byId('panel-layout')},
+      {btn:byId('tab-phi'),   panel:byId('panel-phi')},
+      {btn:byId('tab-find'),  panel:byId('panel-find')}
+    ];
+    for(var t=0;t<tabs.length;t++){
+      (function(T){ T.btn.addEventListener('click', function(){
+        activateTab(T.btn.id);
+      }); })(tabs[t]);
+    }
+
+    buildDeck();
+    wireSelectControls();
+
+    // Robust: wire Create New Basis globally
+    var createBtn = byId('basisStartNew');
+    if(createBtn){
+      createBtn.addEventListener('click', function(e){
+        activateTab('tab-layout');
+        ensureInitBasisTab();
+        startNewBasis();
+      });
+    }
+
+    statusEl.textContent='Ready';
+  } catch(err){
+    if(statusEl) statusEl.textContent='Init error: '+err.message;
+    console.error(err);
+  }
+}
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 
 // ===== Basis/Layout =====
 var basis={ pile:null, gridL:null, gridR:null, suggestedIndex:null, pos2val:null, val2pos:null, mappingComplete:false, locked:false, lockedPos2val:null, editing:false };
-function refreshIfOnLayout(){ if(tabs[1].panel.getAttribute('aria-hidden')==='false'){ refreshBasisEverything(); } }
+
+function ensureInitBasisTab(){
+  if(!basis.pile){
+    initBasisTab();
+  }
+}
+function refreshIfOnLayout(){ if(tabs[1] && tabs[1].panel.getAttribute('aria-hidden')==='false'){ refreshBasisEverything(); } }
 function getSelectedIndicesUnique(){ var arr=getSelectedIndices(); var out=[], seen={}; for(var i=0;i<arr.length;i++){ if(!seen[arr[i]]){ seen[arr[i]]=1; out.push(arr[i]); } } return out; }
 function makeBasisCard(n){ var d=document.createElement('div'); d.className='card faceup'; d.dataset.index=n; d.appendChild(makeFront(n)); d.setAttribute('draggable','true'); d.addEventListener('dragstart', function(e){ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', String(n)); var p=d.closest('.cell'); if(p && p.hasAttribute('data-pos')){ e.dataTransfer.setData('from','grid'); e.dataTransfer.setData('fromPos', p.getAttribute('data-pos')); } else { e.dataTransfer.setData('from','pile'); } }); return d; }
 function basisCellAt(pos){ var rightStart=(DECK===64?32:(DECK===32?16:Infinity)); if(pos<rightStart) return basis.gridL.children[pos]||null; if(pos>=rightStart && rightStart!==Infinity) return basis.gridR.children[pos-rightStart]||null; return null; }
 function buildBasisGrid(){ if(!basis.gridL||!basis.gridR) return; var basisPos=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); basis.gridL.innerHTML=''; basis.gridR.innerHTML=''; var divider=document.querySelector('.bin-divider');
   function makeCell(i){ var d=document.createElement('div'); d.className='cell badge'; d.setAttribute('data-pos', i); d.setAttribute('data-auto','0'); if(basisPos.indexOf(i)!==-1) d.classList.add('basis'); return d; }
-  if(DECK===64){ basis.gridL.className='grid c4x8'; basis.gridR.className='grid c4x8'; for(var i=0;i<32;i++) basis.gridL.appendChild(makeCell(i)); for(var j=32;j<64;j++) basis.gridR.appendChild(makeCell(j)); divider.style.display='block'; }
-  else if(DECK===32){ basis.gridL.className='grid c4x4'; basis.gridR.className='grid c4x4'; for(var a=0;a<16;a++) basis.gridL.appendChild(makeCell(a)); for(var b=16;b<32;b++) basis.gridR.appendChild(makeCell(b)); divider.style.display='block'; }
-  else { basis.gridL.className='grid single4x4'; basis.gridR.className='grid single4x4'; for(var c=0;c<16;c++) basis.gridL.appendChild(makeCell(c)); divider.style.display='none'; }
+  if(DECK===64){ basis.gridL.className='grid c4x8'; basis.gridR.className='grid c4x8'; for(var i=0;i<32;i++) basis.gridL.appendChild(makeCell(i)); for(var j=32;j<64;j++) basis.gridR.appendChild(makeCell(j)); if(divider) divider.style.display='block'; }
+  else if(DECK===32){ basis.gridL.className='grid c4x4'; basis.gridR.className='grid c4x4'; for(var a=0;a<16;a++) basis.gridL.appendChild(makeCell(a)); for(var b=16;b<32;b++) basis.gridR.appendChild(makeCell(b)); if(divider) divider.style.display='block'; }
+  else { basis.gridL.className='grid single4x4'; basis.gridR.className='grid single4x4'; for(var c=0;c<16;c++) basis.gridL.appendChild(makeCell(c)); if(divider) divider.style.display='none'; }
   byId('basisGridTitle').textContent='Grid ('+DECK+' places)'; enableBasisDnD();
 }
 function refreshBasisPile(){ if(!basis.pile) return; var sel=getSelectedIndicesUnique(); basis.pile.innerHTML=''; for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i])); byId('basisUpCount').textContent=String(sel.length); byId('basisQuadCount').textContent=String(computeQuadsBasic(sel)); }
 function enableBasisDnD(){ var droppables=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); droppables.forEach(function(pos){ var cell=basisCellAt(pos); if(!cell) return; cell.addEventListener('dragover', function(e){ e.preventDefault(); cell.classList.add('drop-ok'); }); cell.addEventListener('dragleave', function(){ cell.classList.remove('drop-ok'); }); cell.addEventListener('drop', function(e){ e.preventDefault(); cell.classList.remove('drop-ok'); var idx=parseInt(e.dataTransfer.getData('text/plain'),10); var from=e.dataTransfer.getData('from'); var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); var node=null; if(from==='pile'){ node=basis.pile.querySelector('.card[data-index="'+idx+'"]'); } else if(from==='grid'){ var src=basisCellAt(fromPos); node=src?src.querySelector('.card[data-index="'+idx+'"]'):null; if(src){ src.innerHTML=''; src.classList.add('badge'); src.setAttribute('data-pos', String(fromPos)); src.setAttribute('data-auto','0'); } } if(!node) return; cell.innerHTML=''; cell.classList.add('badge'); cell.setAttribute('data-pos', String(pos)); cell.setAttribute('data-auto','0'); cell.appendChild(node); basisAutoFill(); 
       clearSuggested();
-      // Auto-lock when the pile is empty after placing the last card
-setTimeout(function(){
-  try{
-    if(basis && basis.pile && !basis.locked){
-      var hasChild = !!basis.pile.firstElementChild;
-      var hasCard = !!basis.pile.querySelector('.card');
-      if(!hasChild || !hasCard){ lockPositions(); }
-    }
-  }catch(_e){}
-}, 0);
-scheduleClearBasisMsgOnNextClick(); if(!basis.locked){ var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); var allPlaced=true; for(var z=0; z<anchors.length; z++){ if(readBasisValue(anchors[z])==null){ allPlaced=false; break; } } if(allPlaced){ lockPositions(); } } }); }); basis.pile.addEventListener('dragover', function(e){ e.preventDefault(); }); basis.pile.addEventListener('drop', function(e){ e.preventDefault(); var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); if(!isNaN(fromPos)){ var src=basisCellAt(fromPos); if(src){ var c=src.querySelector('.card'); if(c){ basis.pile.appendChild(c); } src.innerHTML=''; src.classList.add('badge'); src.setAttribute('data-pos', String(fromPos)); src.setAttribute('data-auto','0'); } basisAutoFill(); clearBasisSuggestMsg(); } }); }
+      setTimeout(function(){
+        try{
+          if(basis && basis.pile && !basis.locked){
+            var hasChild = !!basis.pile.firstElementChild;
+            var hasCard = !!basis.pile.querySelector('.card');
+            if(!hasChild || !hasCard){ lockPositions(); }
+          }
+        }catch(_e){}
+      }, 0);
+      scheduleClearBasisMsgOnNextClick(); if(!basis.locked){ var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); var allPlaced=true; for(var z=0; z<anchors.length; z++){ if(readBasisValue(anchors[z])==null){ allPlaced=false; break; } } if(allPlaced){ lockPositions(); } } }); }); basis.pile.addEventListener('dragover', function(e){ e.preventDefault(); }); basis.pile.addEventListener('drop', function(e){ e.preventDefault(); var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); if(!isNaN(fromPos)){ var src=basisCellAt(fromPos); if(src){ var c=src.querySelector('.card'); if(c){ basis.pile.appendChild(c); } src.innerHTML=''; src.classList.add('badge'); src.setAttribute('data-pos', String(fromPos)); src.setAttribute('data-auto','0'); } basisAutoFill(); clearBasisSuggestMsg(); } }); }
 function readBasisValue(pos){ var c=basisCellAt(pos); if(!c) return null; var el=c.querySelector('[data-index]'); return el?+el.dataset.index:null; }
 function snapshotLayoutMapping(){ var pos2=[], val2=Array(DECK); for(var p=0;p<DECK;p++){ var v=readBasisValue(p); if(v==null){ basis.mappingComplete=false; basis.pos2val=null; basis.val2pos=null; return; } pos2[p]=v; val2[v]=p; } basis.pos2val=pos2; basis.val2pos=val2; basis.mappingComplete=true; }
 function makeFaceDownPlaceholder(n){ var ghost=document.createElement('div'); ghost.className='backcard'; ghost.dataset.index=n; ghost.textContent='●'; return ghost; }
@@ -382,6 +421,122 @@ function basisAutoFill(){ if(!basis.gridL||!basis.gridR) return; var v0=readBasi
   updateBasisStats(); snapshotLayoutMapping();
   reconcileSuggestion();
 }
+
+// ---- Suggestion scoring by "most cards placed" ----
+function pileSetNow(){
+  var s={};
+  if(!basis.pile) return s;
+  var els = basis.pile.querySelectorAll('.card[data-index]');
+  for(var i=0;i<els.length;i++){ s[+els[i].dataset.index]=1; }
+  return s;
+}
+// Returns object with current basis values (may be null)
+function currentBasisVals(){
+  return {
+    v0: readBasisValue(0),
+    v1: readBasisValue(1),
+    v2: readBasisValue(2),
+    v4: readBasisValue(4),
+    v8: readBasisValue(8),
+    v16: readBasisValue(16),
+    v32: readBasisValue(32)
+  };
+}
+// Using a hypothetical set of basis values (some may be null), compute
+// an array of {pos, need} for positions that would be auto-determined.
+function computeNeedsForMapping(vals){
+  var out=[];
+  function pushNeed(pos, need){ if(pos<DECK){ out.push({pos:pos, need:need}); } }
+  var v0=vals.v0, v1=vals.v1, v2=vals.v2, v4=vals.v4, v8=vals.v8, v16=vals.v16, v32=vals.v32;
+  // 3,5,6,7
+  if(v0!=null && v1!=null && v2!=null) pushNeed(3, v0^v1^v2);
+  if(v0!=null && v1!=null && v4!=null) pushNeed(5, v0^v1^v4);
+  if(v0!=null && v2!=null && v4!=null) pushNeed(6, v0^v2^v4);
+  if(v1!=null && v2!=null && v4!=null) pushNeed(7, v1^v2^v4);
+  // 8+
+  if(DECK>8 && v8!=null){
+    for(var k=1;k<=7 && 8+k<DECK;k++){
+      var vr = 0, have=true;
+      var bases=[1,2,4];
+      for(var i=0;i<bases.length;i++){
+        var b=bases[i];
+        if(k & b){
+          var vv = (b===1? v1 : b===2? v2 : v4);
+          if(vv==null){ have=false; break; }
+          vr ^= vv;
+        }
+      }
+      if(!have) continue;
+      var need = (popcount(k)%2===1 && v0!=null)? (v0 ^ vr ^ v8) : (vr ^ v8);
+      pushNeed(8+k, need);
+    }
+  }
+  // 16+
+  if(DECK>16 && v16!=null){
+    for(var k2=1;k2<=15 && 16+k2<DECK;k2++){
+      var bases2=[1,2,4,8];
+      var vr2=0, have2=true;
+      for(var i2=0;i<bases2.length;i++){
+        var b2=bases2[i2];
+        if(k2 & b2){
+          var vv2 = (b2===1? v1 : b2===2? v2 : b2===4? v4 : v8);
+          if(vv2==null){ have2=false; break; }
+          vr2 ^= vv2;
+        }
+      }
+      if(!have2) continue;
+      var need2 = (popcount(k2)%2===1 && v0!=null)? (v0 ^ vr2 ^ v16) : (vr2 ^ v16);
+      pushNeed(16+k2, need2);
+    }
+  }
+  // 32+
+  if(DECK>32 && v32!=null){
+    for(var k3=1;k3<=31 && 32+k3<DECK;k3++){
+      var bases3=[1,2,4,8,16];
+      var vr3=0, have3=true;
+      for(var i3=0;i<bases3.length;i++){
+        var b3=bases3[i3];
+        if(k3 & b3){
+          var vv3 = (b3===1? v1 : b3===2? v2 : b3===4? v4 : b3===8? v8 : v16);
+          if(vv3==null){ have3=false; break; }
+          vr3 ^= vv3;
+        }
+      }
+      if(!have3) continue;
+      var need3 = (popcount(k3)%2===1 && v0!=null)? (v0 ^ vr3 ^ v32) : (vr3 ^ v32);
+      pushNeed(32+k3, need3);
+    }
+  }
+  return out;
+}
+// Score: how many real pile cards would be placed if we assign `candidate` to basis position `nextPos`
+function placementScore(nextPos, candidate){
+  var vals = currentBasisVals();
+  if(nextPos===0) return 0; // handled by suggestZero()
+  if(nextPos===1) vals.v1 = candidate;
+  else if(nextPos===2) vals.v2 = candidate;
+  else if(nextPos===4) vals.v4 = candidate;
+  else if(nextPos===8) vals.v8 = candidate;
+  else if(nextPos===16) vals.v16 = candidate;
+  else if(nextPos===32) vals.v32 = candidate;
+  else return 0;
+
+  var needs = computeNeedsForMapping(vals);
+
+  // Simulated pile (cards available to move), remove the candidate since it will occupy basis nextPos
+  var sim = pileSetNow();
+  delete sim[candidate];
+
+  var score = 0;
+  for(var i=0;i<needs.length;i++){
+    var need = needs[i].need;
+    if(sim[need]){ score++; delete sim[need]; }
+  }
+  // Placing the candidate itself counts as 1
+  score += 1;
+  return score;
+}
+
 function updateBasisStats(){ var up=getSelectedIndicesUnique(); byId('basisUpCount').textContent=String(up.length); byId('basisQuadCount').textContent=String(computeQuadsBasic(up)); }
 function initBasisTab(){
   basis.pile=byId('basisPile');
@@ -391,11 +546,11 @@ function initBasisTab(){
   showPreBasisGrid();
   basis.pile.innerHTML='';
   updateBasisStats();
-  var startBtn = byId('basisStartNew'); if(startBtn){ startBtn.onclick = startNewBasis; }
+  var startBtn = byId('basisStartNew'); if(startBtn){ startBtn.onclick = function(){ startNewBasis(); }; }
   var s0 = byId('basisSuggest0'); if(s0){ s0.onclick = suggestZero; }
   var sn = byId('basisSuggestNext'); if(sn){ sn.onclick = suggestNextBasis; }
   var resetBtn = byId('basisResetLayout'); if(resetBtn){ resetBtn.onclick = resetToStandardLayout; }
-if(byId('basisSuggest0')) byId('basisSuggest0').disabled = true;
+  if(byId('basisSuggest0')) byId('basisSuggest0').disabled = true;
   if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = true;
 }
 function refreshBasisEverything(){ if(basis.editing){ buildBasisGrid(); refreshBasisPile(); basisAutoFill(); } else { showPreBasisGrid(); updateBasisStats(); } }
@@ -434,40 +589,263 @@ function resetToStandardLayout(){ clearBasisSuggestMsg();
 function makeStaticCard(n){ var cell=document.createElement('div'); cell.className='cell'; var card=document.createElement('div'); card.className='card'; if(isFaceUp(n)) card.classList.add('faceup'); card.dataset.index=n; var front=makeFront(n); var back=document.createElement('div'); back.className='back'; back.textContent='●'; card.appendChild(front); card.appendChild(back); cell.appendChild(card); return cell; }
 function currentPositionMap(){ if(basis.locked && basis.lockedPos2val) return basis.lockedPos2val.slice(0); if(basis.mappingComplete && basis.pos2val) return basis.pos2val.slice(0); var m=[]; for(var i=0;i<DECK;i++) m[i]=i; return m; }
 function showPreBasisGrid(){ if(!basis.gridL||!basis.gridR) return; var map=currentPositionMap(); basis.gridL.innerHTML=''; basis.gridR.innerHTML=''; var divider=document.querySelector('.bin-divider'); if(DECK===64){ basis.gridL.className='grid c4x8'; basis.gridR.className='grid c4x8'; for(var i=0;i<32;i++) basis.gridL.appendChild(makeStaticCard(map[i])); for(var j=32;j<64;j++) basis.gridR.appendChild(makeStaticCard(map[j])); if(divider) divider.style.display='block'; } else if(DECK===32){ basis.gridL.className='grid c4x4'; basis.gridR.className='grid c4x4'; for(var a=0;a<16;a++) basis.gridL.appendChild(makeStaticCard(map[a])); for(var b=16;b<32;b++) basis.gridR.appendChild(makeStaticCard(map[b])); if(divider) divider.style.display='block'; } else { basis.gridL.className='grid single4x4'; basis.gridR.className='grid single4x4'; for(var c=0;c<16;c++) basis.gridL.appendChild(makeStaticCard(map[c])); if(divider) divider.style.display='none'; } byId('basisGridTitle').textContent='Grid (current positions)'; }
-function startNewBasis(){ clearSuggest0Msg(); var _m=byId('basisResetMsg'); if(_m) _m.textContent=''; clearBasisSuggestMsg(); basis.editing=true; buildBasisGrid(); refreshBasisPile(); basisAutoFill(); if(byId('basisSuggest0')) byId('basisSuggest0').disabled = false; if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = false; }
+function clearBasisSuggestMsg(){
+  var m = byId('basisSuggestMsg'); if(m) m.textContent = '';
+  var m0 = byId('basisSuggest0Msg'); if(m0) m0.textContent = '';
+  var mN = byId('basisSuggestNextMsg'); if(mN) mN.textContent = '';
+}
+function startNewBasis(){ clearBasisSuggestMsg(); var _m=byId('basisResetMsg'); if(_m) _m.textContent=''; basis.editing=true; 
+var s0 = byId('basisSuggest0'); if (s0) s0.disabled = false;
+var sn = byId('basisSuggestNext');
+if (sn) {
+  sn.disabled = false;
+  sn.onclick = suggestNextBasis;
+}
+buildBasisGrid(); refreshBasisPile(); basisAutoFill(); if(byId('basisSuggest0')) byId('basisSuggest0').disabled = false; if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = false; }
 
 // Suggestion helpers
 function clearSuggested(){ var prev=basis.pile?basis.pile.querySelector('.card.suggested'):null; if(prev) prev.classList.remove('suggested'); }
 function highlightSuggested(idx,msgEl,msg){ clearSuggested(); var el=basis.pile?basis.pile.querySelector('.card[data-index="'+idx+'"]'):null; if(el){ el.classList.add('suggested'); if(msgEl) msgEl.textContent = msg||('Suggested card: '+idx); } else { if(msgEl) msgEl.textContent = 'No available card to suggest.'; } }
 function getPlacedValuesSet(){ var set={}; var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); for(var i=0;i<anchors.length;i++){ var v=readBasisValue(anchors[i]); if(v!=null) set[v]=1; } return set; }
-function findNextFromPile(excludeSet){ if(!basis.pile) return null; var cards=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]'));
-  for(var i=0;i<cards.length;i++){ var idx=+cards[i].dataset.index; if(!excludeSet[idx]) return idx; }
-  return null;
-}
-
-// ===== Improved Suggestion Logic (quads-aware) =====
+function pileCandidateArray(excludeSet){ if(!basis.pile) return []; var els=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]')); var out=[]; for(var i=0;i<els.length;i++){ var v=+els[i].dataset.index; if(!excludeSet || !excludeSet[v]) out.push(v); } return out; }
 function getFaceUpArray(){ return getSelectedIndices(); }
 function getFaceUpSet(){ var arr=getFaceUpArray(); var s={}; for(var i=0;i<arr.length;i++) s[arr[i]]=1; return s; }
-function pileCandidateArray(excludeSet){ if(!basis.pile) return []; var els=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]')); var out=[]; for(var i=0;i<els.length;i++){ var v=+els[i].dataset.index; if(!excludeSet || !excludeSet[v]) out.push(v); } return out; }
-function countQuadsInSubset(arr){ return computeQuadsBasic(arr.slice()); }
 function countQuadsForCard(v, Uarr, Uset){ var cnt=0; for(var i=0;i<Uarr.length;i++){ var b=Uarr[i]; if(b===v) continue; for(var j=i+1;j<Uarr.length;j++){ var c=Uarr[j]; if(c===v) continue; var d=(v^b^c); if(d in Uset && d>c && d!==v && d!==b && d!==c && d<DECK) cnt++; } } return cnt; }
-function countQuadsForPair(a,b,Uarr,Uset){ if(a==null||b==null) return 0; var cnt=0; for(var i=0;i<Uarr.length;i++){ var c=Uarr[i]; if(c===a||c===b) continue; var d=(a^b^c); if(d in Uset && d>c && d!==a && d!==b && d!==c && d<DECK) cnt++; } return cnt; }
-function spanFrom(values){ // generate XOR-closure of values (excluding 0)
-  var basis=values.filter(function(x){return typeof x==='number';}); var span=[0]; for(var i=0;i<basis.length;i++){ var v=basis[i]; var add=[]; for(var j=0;j<span.length;j++) add.push(span[j]^v); span=span.concat(add); }
-  var seen={}, out=[]; for(var k=0;k<span.length;k++){ var val=span[k]; if(val!==0 && val<DECK && !seen[val]){ seen[val]=1; out.push(val); } } return out; }
-function placedBasisValues(){ var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); var vals=[]; for(var i=0;i<anchors.length;i++){ var v=readBasisValue(anchors[i]); if(v!=null) vals.push(v); } return vals; }
 
 
-// --- Helper: clear basis suggestion messages ---
-function clearBasisSuggestMsg(){
-  var m = byId('basisSuggestMsg');
-  if(m) m.textContent = '';
-  var m0 = byId('basisSuggest0Msg');
-  if(m0) m0.textContent = '';
-  var mN = byId('basisSuggestNextMsg');
-  if(mN) mN.textContent = '';
+function suggestZero(){
+  var msgEl = byId('basisSuggest0Msg') || byId('basisMsg');
+  if (!basis.editing) {
+    if (msgEl) msgEl.textContent = 'Click "Create new basis" first.';
+    return;
+  }
+  // If already filled, keep the existing message behavior
+  if (readBasisValue(0) != null) {
+    if (msgEl) msgEl.textContent = 'Position 0 already placed.';
+    return;
+  }
+  // Universe of face-up cards
+  var Uarr = (typeof getFaceUpArray==='function') ? getFaceUpArray() : [];
+  var Uset = {}; for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
+  // Candidates from pile
+  var exclude = getPlacedValuesSet();
+  var candidates = pileCandidateArray(exclude);
+  if (candidates.length === 0) {
+    highlightSuggested(null, msgEl, 'No available card to suggest.');
+    return;
+  }
+  // Count quads containing candidate v: for each c in U, let d=v^c^w, iterate w via U and count unique quads.
+  function countQuadsWith(v){
+    var cnt=0;
+    for (var a=0; a<Uarr.length; a++){
+      var c = Uarr[a];
+      if (c===v) continue;
+      for (var b=a+1; b<Uarr.length; b++){
+        var w = Uarr[b];
+        if (w===v || w===c) continue;
+        var d = (v ^ c ^ w);
+        if (Uset[d] && d!==v && d!==c && d!==w && d>w && d<DECK) {
+          cnt++;
+        }
+      }
+    }
+    return cnt;
+  }
+  var best=null, bestScore=-1;
+  for (var k=0;k<candidates.length;k++){
+    var x=candidates[k];
+    var s=countQuadsWith(x);
+    if (s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
+  }
+  var why = (best!=null) ? ('Suggested because it participates in ' + bestScore + ' face-up quads — the strongest starting card.') : null;
+  highlightSuggested(best, msgEl, why);
 }
-// --- One-shot message clear on next click after a drop ---
+
+
+
+// Compute WHICH indices would be placed for a given anchor `next` and candidate `cand`
+// Uses the SAME availability criterion as card-gain: value must be available in the pile (including cand itself).
+function placementDetails(next, cand){
+  try{
+    var v0 = readBasisValue(0);
+    var v1 = readBasisValue(1);
+    var v2 = readBasisValue(2);
+    var v4 = readBasisValue(4);
+    var v8 = readBasisValue(8);
+    var v16 = (next===16 ? cand : readBasisValue(16));
+    var v32 = (next===32 ? cand : readBasisValue(32));
+
+    var exclude = getPlacedValuesSet();
+    var pile = pileCandidateArray(exclude);
+    var pileSet = {}; for (var i=0; i<pile.length; i++) pileSet[pile[i]] = 1;
+    pileSet[cand] = 1; // ensure the candidate itself counts
+
+    function needForIndex(k){
+      var x = 0, bits = k;
+      if ((bits & 1)  && v1  != null) x ^= v1;
+      if ((bits & 2)  && v2  != null) x ^= v2;
+      if ((bits & 4)  && v4  != null) x ^= v4;
+      if ((bits & 8)  && v8  != null) x ^= v8;
+      if ((bits & 16) && v16 != null) x ^= v16;
+      if ((bits & 32) && v32 != null) x ^= v32;
+      var pop = ((k&1)?1:0)+((k&2)?1:0)+((k&4)?1:0)+((k&8)?1:0)+((k&16)?1:0)+((k&32)?1:0);
+      if ((pop % 2)===1 && v0!=null) x ^= v0;
+      return x;
+    }
+
+    var start = next, end = Math.min(DECK-1, 2*next - 1);
+    if (next===32) end = Math.min(DECK-1, 63);
+    if (start==null) return [];
+
+    var indices = [];
+    for (var k=start; k<=end; k++){
+      var req = needForIndex(k);
+      if (req < DECK && pileSet[req]) indices.push(k);
+    }
+    return indices;
+  }catch(_){ return []; }
+}
+
+
+// EXACT auto-fill preview: which indices would actually place now for (next, cand)
+function placementDetailsExactAutoFill(next, cand){
+  try{
+    var v0  = readBasisValue(0);
+var v1  = readBasisValue(1);
+var v2  = (next===2  ? cand : readBasisValue(2));
+var v4  = (next===4  ? cand : readBasisValue(4));
+var v8  = (next===8  ? cand : readBasisValue(8));
+var v16 = (next===16 ? cand : readBasisValue(16));
+var v32 = (next===32 ? cand : readBasisValue(32));
+function allRequiredAnchorsKnown(k){
+      if ((k & 1)  && v1  == null) return false;
+      if ((k & 2)  && v2  == null) return false;
+      if ((k & 4)  && v4  == null) return false;
+      if ((k & 8)  && v8  == null) return false;
+      if ((k & 16) && v16 == null) return false;
+      if ((k & 32) && v32 == null) return false;
+      return true;
+    }
+var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
+
+    var exclude = getPlacedValuesSet();
+    var pile    = pileCandidateArray(exclude);
+    var pileSet = {}; for (var i=0;i<pile.length;i++) pileSet[pile[i]] = 1;
+    pileSet[cand] = 1; // ensure candidate counts
+
+    var mask = (next - 1);
+
+    function needForIndex(k){
+      var x = 0;
+      if ((k & 1)  && v1  != null) x ^= v1;
+      if ((k & 2)  && v2  != null) x ^= v2;
+      if ((k & 4)  && v4  != null) x ^= v4;
+      if ((k & 8)  && v8  != null) x ^= v8;
+      if ((k & 16) && v16 != null) x ^= v16;
+      if ((k & 32) && v32 != null) x ^= v32;
+
+      var low = k & mask;
+      var t = low; t = t - ((t >>> 1) & 0x55555555);
+      t = (t & 0x33333333) + ((t >>> 2) & 0x33333333);
+      var parity = (((t + (t >>> 4)) & 0x0F) % 2);
+      if (parity === 1 && v0 != null) x ^= v0;
+
+      return x;
+    }
+
+    var start = next;
+    var end   = Math.min(2*next - 1, 63);
+    var indices = [];
+    for (var k=start; k<=end; k++){
+      if (pos2val && typeof pos2val[k] === 'number') continue;
+      var req = needForIndex(k);
+      if (req < DECK && pileSet[req]) indices.push(k);
+    }
+    return indices;
+  }catch(_){ return []; }
+}
+
+function suggestNextBasis(){
+  var msgEl=byId('basisSuggestNextMsg');
+  if(!basis.editing){ if(msgEl) msgEl.textContent='Click "Create new basis" first.'; return; }
+  // Next unfilled basis among 1,2,4,8,16,32
+  var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;});
+  var next=null; for(var i=0;i<anchors.length;i++){ if(readBasisValue(anchors[i])==null){ next=anchors[i]; break; } }
+  if(next==null){ if(msgEl) msgEl.textContent='All basis positions are filled.'; return; }
+
+  var exclude=getPlacedValuesSet();
+  var candidates=pileCandidateArray(exclude);
+  if(candidates.length===0){ highlightSuggested(null,msgEl,'No available card to suggest.'); return; }
+
+  if (next === 1) {
+    var msgEl = byId('basisSuggestNextMsg') || byId('basisMsg');
+    var v0 = readBasisValue(0);
+    if (v0 == null) {
+      if (msgEl) msgEl.textContent = 'Place position 0 first (use "Suggest 0").';
+      highlightSuggested(null, msgEl, null);
+      return;
+    }
+    var Uarr = (typeof getFaceUpArray==='function') ? getFaceUpArray() : [];
+    var Uset = {}; for (var i2=0;i2<Uarr.length;i2++) Uset[Uarr[i2]] = 1;
+    var exclude = getPlacedValuesSet();
+    var candidates = pileCandidateArray(exclude);
+    if (candidates.length === 0) {
+      if (msgEl) msgEl.textContent = 'No available card to suggest.';
+      highlightSuggested(null, msgEl, null);
+      return;
+    }
+    function countPairQuads(a, b) {
+      var cnt = 0;
+      for (var i3 = 0; i3 < Uarr.length; i3++) {
+        var c = Uarr[i3];
+        if (c === a || c === b) continue;
+        var d = (a ^ b ^ c);
+        if (Uset[d] && d !== a && d !== b && d !== c && d > c && d < DECK) cnt++;
+      }
+      return cnt;
+    }
+    var best = null, bestScore = -1;
+    for (var k = 0; k < candidates.length; k++) {
+      var x = candidates[k];
+      var s = countPairQuads(v0, x);
+      if (s > bestScore || (s === bestScore && x < best)) { bestScore = s; best = x; }
+    }
+    var why = (best != null)
+      ? ('Suggested because together with the card in position 0, it forms ' + bestScore + ' quads — the strongest pair available.')
+      : null;
+    highlightSuggested(best, msgEl, why);
+    if (msgEl && why) msgEl.textContent = why;
+    return;
+  }
+  // Unified non-pos1 scoring: exact auto-fill preview drives both score and message
+  if (next !== 1){
+    var best = null, bestList = [], bestScore = -1;
+    for (var j = 0; j < candidates.length; j++){
+      var cand = candidates[j];
+      var lst  = (typeof placementDetailsExactAutoFill === 'function') ? placementDetailsExactAutoFill(next, cand) : [];
+      var placed = lst.length;
+      if (placed > bestScore || (placed === bestScore && cand < best)){
+        bestScore = placed; best = cand; bestList = lst;
+      }
+    }
+    var _msg = (best != null) ? ('would place ' + bestScore + ' cards: [' + bestList.join(', ') + ']') : null;
+    highlightSuggested(best, msgEl, _msg);
+    if (!msgEl) msgEl = document.getElementById('basisSuggestNextMsg') || document.getElementById('basisMsg');
+    if (msgEl && _msg) msgEl.textContent = _msg;
+    return;
+  }
+
+var best=null, bestScore=-1;
+  for(var c=0;c<candidates.length;c++){
+    var x=candidates[c];
+    var s=placementScore(next, x);
+    if(s>bestScore || (s===bestScore && x<best)){
+      bestScore=s; best=x;
+    }
+  }
+  highlightSuggested(best, msgEl, best!=null ? ('would place ' + bestScore + ' cards') : null);
+}
+
 var _basisMsgClearScheduled = false;
 function scheduleClearBasisMsgOnNextClick(){
   if(_basisMsgClearScheduled) return;
@@ -477,111 +855,10 @@ function scheduleClearBasisMsgOnNextClick(){
     _basisMsgClearScheduled = false;
     document.removeEventListener('click', handler, true);
   };
-  // Use capture so we clear before most UI handlers; emulate {once:true} for broad support
   document.addEventListener('click', handler, true);
 }
-
-
-// Clear the Suggest 0 message
-function clearSuggest0Msg(){
-  var m = byId('basisSuggest0Msg'); if(m){ m.textContent=''; }
-}
-function suggestZero(){
-  if(!basis.editing){ var m=byId('basisSuggest0Msg'); if(m) m.textContent='Click "Choose new basis" first.'; return; }
-  var v0=readBasisValue(0); var msgEl=byId('basisSuggest0Msg'); if(v0!=null){ clearSuggested(); if(msgEl) msgEl.textContent='0 already placed.'; return; }
-  var Uarr=getFaceUpArray(); var Uset=getFaceUpSet();
-  var exclude=getPlacedValuesSet();
-  var candidates=pileCandidateArray(exclude);
-  if(candidates.length===0){ highlightSuggested(null,msgEl,'No available card to suggest.'); return; }
-  var best=null, bestScore=-1;
-  for(var i=0;i<candidates.length;i++){
-    var x=candidates[i]; var s=countQuadsForCard(x,Uarr,Uset);
-    if(s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
-  }
-  highlightSuggested(best, msgEl, best!=null ? ('In ' + bestScore + ' quads') : null);
-}
-
-function suggestNextBasis(){
-  clearSuggest0Msg(); if(!basis.editing){ var m=byId('basisSuggestNextMsg'); if(m) m.textContent='Click "Choose new basis" first.'; return; }
-  var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;}); var next=null; for(var i=0;i<anchors.length;i++){ if(readBasisValue(anchors[i])==null){ next=anchors[i]; break; } }
-  var msgEl=byId('basisSuggestNextMsg'); if(next==null){ if(msgEl) msgEl.textContent='All basis positions are filled.'; return; }
-  var exclude=getPlacedValuesSet(); var candidates=pileCandidateArray(exclude); if(candidates.length===0){ highlightSuggested(null,msgEl,'No available card to suggest.'); return; }
-  var Uarr=getFaceUpArray(); var Uset=getFaceUpSet();
-  var best=null, bestScore=-1;
-  var v0=readBasisValue(0);
-  if(next===1 && v0!=null){
-    // choose x maximizing quads that include both v0 and x
-    for(var k=0;k<candidates.length;k++){
-      var x=candidates[k]; var s=countQuadsForPair(v0,x,Uarr,Uset);
-      if(s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
-    }
-    highlightSuggested(best, msgEl, best!=null ? ('makes a pair that is in ' + bestScore + ' quads') : null);
-
-    return;
-  }
-  // remaining positions: maximize additional face-up *cards* inside AFFINE odd-span(placed ∪ {x})
-  var placed = placedBasisValuesAffine();
-  var currentSpanArr = oddSpanFrom(placed);
-  // build set for membership checks && counting
-  var spanSet = {}; for (var i=0;i<currentSpanArr.length;i++) spanSet[currentSpanArr[i]] = 1;
-  // count face-up cards currently in span
-  var baseCount = 0; for (var k in Uset) if (Uset.hasOwnProperty(k) && spanSet[k]) baseCount++;
-  for (var t=0; t<candidates.length; t++){
-    var x = candidates[t];
-    // Skip candidates already in the current affine span — they won't expand it
-    if (spanSet[x]) continue;
-    var newSpanArr = oddSpanFrom(placed.concat([x]));
-    var newSet = {}; for (var j=0;j<newSpanArr.length;j++) newSet[newSpanArr[j]] = 1;
-    // count face-up cards in new span
-    var newCount = 0; for (var k2 in Uset) if (Uset.hasOwnProperty(k2) && newSet[k2]) newCount++;
-    var gain = newCount - baseCount;  // additional cards in span
-    if (gain > bestScore || (gain === bestScore && x < best)) { bestScore = gain; best = x; }
-  }
-  // message simplified to reflect additional cards in the span
-  highlightSuggested(best, msgEl, best!=null ? ('will position ' + bestScore + ' cards.') : null);
-
-
-}
-
 function reconcileSuggestion(){ var s=basis.pile?basis.pile.querySelector('.card.suggested'):null; if(!s) return; var idx=+s.dataset.index; var stillInPile = !!(basis.pile.querySelector('.card[data-index="'+idx+'"]')); if(!stillInPile) s.classList.remove('suggested'); }
 
-
-// --- Affine span helpers (odd-subset sums over basis including position 0) ---
-function placedBasisValuesAffine(){
-  // Include position 0 as an affine offset/basis element when present
-  var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;});
-  var vals=[];
-  for(var i=0;i<anchors.length;i++){
-    var v=readBasisValue(anchors[i]);
-    if(v!=null) vals.push(v);
-  }
-  return vals;
-}
-
-// Build XORs of all subsets of `values` with ODD cardinality (affine view)
-// Returns a de-duplicated array in [1, DECK-1] (excludes 0) clipped to current DECK
-function oddSpanFrom(values){
-  var deckMax = DECK; // current deck constraint
-  var even = [0];           // XORs of even-sized subsets (start with empty subset)
-  var odd  = [];            // XORs of odd-sized subsets
-  for(var i=0;i<values.length;i++){
-    var v = values[i] & ((DECK===64)?63:(DECK===32?31:15)); // mask to deck size
-    // compute new lists
-    var newEven = even.slice();
-    for(var j=0;j<odd.length;j++) newEven.push(odd[j]^v);
-    var newOdd = odd.slice();
-    for(var j2=0;j2<even.length;j2++) newOdd.push(even[j2]^v);
-    even = newEven;
-    odd = newOdd;
-  }
-  // Deduplicate, drop 0, and clip to deck
-  var seen={}, out=[];
-  for(var k=0;k<odd.length;k++){
-    var val = odd[k];
-    if(val!==0 && val<deckMax && !seen[val]){ seen[val]=1; out.push(val); }
-  }
-  return out;
-}
 // ===== Phi Map =====
 var phi={ gridL:null, gridR:null, part:null, initialized:false, flowActive:false, selA:null, selB:null, lastPhi:null, quadsBefore:0, quadsAfter:0 };
 function buildPhiGridIfInit(){ if(phi.initialized) buildPhiGrid(); }
@@ -637,18 +914,174 @@ function applyFlow(){
 }
 function undoPhiMap(){ if(!phi.lastPhi) return; if(phi.lastPhi.deck!==DECK){ setPhiInfo('Cannot undo: deck size changed.'); clearPhiUndo(); return; } var s=phi.lastPhi.swaps||[]; for(var i=0;i<s.length;i++){ var f=s[i].from, t=s[i].to; if(isFaceUp(t)) setFaceUp(t,false); if(!isFaceUp(f)) setFaceUp(f,true); } updateUpCount(); phi.quadsAfter = computeQuadsBasic(getSelectedIndices()); updatePhiQuadsDisplay(); setPhiInfo('Undid last φ-map.'); clearPhiUndo(); buildPhiGrid(); }
 
-// ---- Lightweight sanity checks (non-blocking) ----
+// ===== Find Quads =====
+var find = {
+  initialized:false,
+  gridL:null, gridR:null,
+  selected:[],
+  found:[],
+  foundSet:{}
+};
+function buildFindGridIfInit(){ if(find.initialized) buildFindGrid(); }
+function initFindTab(){
+  find.gridL = byId('find-grid-left');
+  find.gridR = byId('find-grid-right');
+  byId('findClearSel').onclick = clearFindSelection;
+  byId('findResetList').onclick = resetFoundList;
+  find.initialized = true;
+  buildFindGrid();
+  updateFindCounts();
+}
+function buildFindGrid(){
+  if(!find.gridL || !find.gridR) return;
+  find.gridL.innerHTML=''; find.gridR.innerHTML='';
+  var map = currentPositionMap();
+  var leftCount=(DECK===64?32:(DECK===32?16:DECK));
+  var gridClass=(DECK===64?'grid c4x8':(DECK===32?'grid c4x4':'grid single4x4'));
+  find.gridL.className=gridClass; find.gridR.className=gridClass;
+
+  for(var p=0;p<DECK;p++){
+    var v=map[p];
+    var cell=document.createElement('div'); cell.className='cell';
+    var card=document.createElement('div'); card.className='card'; card.dataset.index=v;
+    if(isFaceUp(v)) card.classList.add('faceup');
+    card.appendChild(makeFront(v));
+    var back=document.createElement('div'); back.className='back'; back.textContent='●';
+    card.appendChild(back);
+    cell.appendChild(card);
+    var target=(p<leftCount)?find.gridL:find.gridR;
+    target.appendChild(cell);
+
+    (function(cardEl, value){
+      cardEl.addEventListener('click', function(){
+        var up = cardEl.classList.contains('faceup');
+        if(!up) { setFindMsg('Select only face-up cards.'); return; }
+        toggleFindSelection(cardEl, value);
+      });
+    })(card, v);
+  }
+
+  var dividers=document.querySelectorAll('.bin-divider');
+  var divider=dividers.length>1?dividers[dividers.length-1]:dividers[0];
+  if(divider) divider.style.display=(DECK===16?'none':'block');
+
+  byId('findGridTitle').textContent = 'Find Quads Grid';
+  setFindMsg('Pick four face-up cards to test for a quad.');
+  syncFindSelectedClass();
+  renderFoundList();
+  updateFindCounts();
+}
+function setFindMsg(msg){ var el=byId('findMsg'); if(el) el.textContent=msg||''; }
+function toggleFindSelection(cardEl, value){
+  var idx = find.selected.indexOf(value);
+  if(idx>=0){
+    find.selected.splice(idx,1);
+    cardEl.classList.remove('selected');
+    updateFindCounts();
+    return;
+  }
+  if(find.selected.length>=4){
+    setFindMsg('You already have 4 selected. Clear or deselect one.');
+    return;
+  }
+  find.selected.push(value);
+  cardEl.classList.add('selected');
+  if(find.selected.length===4){
+    checkAndStoreQuad(find.selected.slice());
+  }
+  updateFindCounts();
+}
+function clearFindSelection(){
+  find.selected.length=0;
+  syncFindSelectedClass();
+  updateFindCounts();
+  setFindMsg('Selection cleared.');
+}
+function syncFindSelectedClass(){
+  var cards=document.querySelectorAll('#find-grid-left .card, #find-grid-right .card');
+  for(var i=0;i<cards.length;i++) cards[i].classList.remove('selected');
+  for(var j=0;j<find.selected.length;j++){
+    var v=find.selected[j];
+    var el=document.querySelector('#find-grid-left .card[data-index="'+v+'"], #find-grid-right .card[data-index="'+v+'"]');
+    if(el) el.classList.add('selected');
+  }
+}
+function keyForQuad(arr){
+  var s=arr.slice().sort(function(a,b){return a-b;});
+  return s.join(',');
+}
+function isQuad(arr){
+  if(arr.length!==4) return false;
+  var mask=(DECK===64?63:(DECK===32?31:15));
+  var a=arr[0]&mask, b=arr[1]&mask, c=arr[2]&mask, d=arr[3]&mask;
+  return ((a^b^c^d)===0);
+}
+function checkAndStoreQuad(sel4){
+  for(var i=0;i<sel4.length;i++){ if(!isFaceUp(sel4[i])){ setFindMsg('All four must be face-up.'); return finishSelection(false); } }
+  if(!isQuad(sel4)){
+    setFindMsg('Not a quad. Try again.');
+    return finishSelection(false);
+  }
+  var key=keyForQuad(sel4);
+  if(find.foundSet[key]){
+    setFindMsg('You already found that quad.');
+    return finishSelection(true);
+  }
+  var total = computeQuadsBasic(getSelectedIndices());
+  var cap = Math.min(20, total);
+  if(find.found.length >= cap){
+    setFindMsg('List full (' + cap + '). Reset to add more.');
+    return finishSelection(true);
+  }
+  var sorted=sel4.slice().sort(function(a,b){return a-b;});
+  find.found.push(sorted);
+  find.foundSet[key]=1;
+  renderFoundList();
+  updateFindCounts();
+  setFindMsg('✔ Quad recorded!');
+  return finishSelection(true);
+}
+function finishSelection(clearIt){
+  if(clearIt){ find.selected.length=0; }
+  syncFindSelectedClass();
+}
+function renderFoundList(){
+  var wrap=byId('foundQuadsWrap');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  for(var i=0;i<find.found.length;i++){
+    var q=find.found[i];
+    var row=document.createElement('div'); row.className='found-quad';
+    for(var j=0;j<q.length;j++){
+      row.appendChild(makeMiniCard(q[j]));
+    }
+    wrap.appendChild(row);
+  }
+}
+function makeMiniCard(n){
+  var c=document.createElement('div'); c.className='mini';
+  var front=makeFront(n); front.classList.add('front');
+  c.appendChild(front);
+  return c;
+}
+function resetFoundList(){
+  find.found.length=0;
+  find.foundSet={};
+  renderFoundList();
+  updateFindCounts();
+  setFindMsg('Found list reset.');
+}
+function updateFindCounts(){
+  var totalEl=byId('findTotalQuads');
+  var foundEl=byId('findFoundCount');
+  if(totalEl) totalEl.textContent = String(computeQuadsBasic(getSelectedIndices()));
+  if(foundEl){ var total = computeQuadsBasic(getSelectedIndices()); var cap = Math.min(20, total); foundEl.textContent = String(find.found.length) + ' / ' + cap; }
+}
+
+// ---- Tiny sanity checks ----
 (function(){ try{
   console.assert(computeQuadsBasic([])===0, '0 quads for empty');
   console.assert(computeQuadsBasic([0,1,2,3])===1, 'one quad in 0,1,2,3');
-  // Extra tests
-  console.assert(computeQuadsBasic([0,1,2])===0, 'no quad in 0,1,2');
-  console.assert(computeQuadsBasic([0,1,2,3,4])===1, 'still one quad when adding 4');
-  console.assert(computeQuadsBasic([0,1,2,3,3,3])===1, 'duplicates should be ignored');
-  // Span sanity checks
-  console.assert(JSON.stringify(spanFrom([1]))==JSON.stringify([1]), 'span([1]) == [1]');
-  var s12 = spanFrom([1,2]).sort(function(a,b){return a-b;});
-  console.assert(JSON.stringify(s12)==JSON.stringify([1,2,3]), 'span([1,2]) == [1,2,3]');
 } catch(e){ console.warn('Sanity tests failed', e); } })();
 </script>
 </body>
