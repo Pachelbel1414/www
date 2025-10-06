@@ -48,6 +48,9 @@
     .drop-ok{outline:3px solid var(--brand);outline-offset:2px}
     .backcard{background:var(--card);border:1px solid var(--border);border-radius:10px;height:60px;display:flex;align-items:center;justify-content:center;color:#9ca3af;width:var(--card-w)}
     .suggested{ box-shadow: inset 0 0 0 3px var(--brand); }
+    /* Light blue shadow when a card sits in a basis position */
+    .card.basis-placed { box-shadow: 0 0 0 4px #c7d2fe; }
+
 
     /* Phi map */
     .phiCell{cursor:pointer}
@@ -460,10 +463,11 @@ function enableBasisDnD(){
         } 
       }
       if(!node) return; 
-      cell.innerHTML=''; 
+      var prev=cell.querySelector('.card');if(prev && basis && basis.pile){ prev.classList.remove('basis-placed','suggested'); basis.pile.appendChild(prev); }cell.innerHTML=''; 
       cell.classList.add('badge'); 
       cell.setAttribute('data-pos', String(pos)); 
       cell.setAttribute('data-auto','0'); 
+      if(node){ node.classList.remove('suggested'); node.classList.add('basis-placed'); }
       cell.appendChild(node); 
       basisAutoFill(); 
       clearSuggested();
@@ -479,7 +483,7 @@ function enableBasisDnD(){
       var src=basisCellAt(fromPos); 
       if(src){ 
         var c=src.querySelector('.card'); 
-        if(c){ basis.pile.appendChild(c); } 
+        if(c){ c.classList.remove('basis-placed','suggested'); basis.pile.appendChild(c); } 
         src.innerHTML=''; 
         src.classList.add('badge'); 
         src.setAttribute('data-pos', String(fromPos)); 
@@ -534,7 +538,7 @@ function placeBasisAuto(targetPos, value){
   var already = cell.querySelector('.card[data-index="'+value+'"]');
   if(already){ cell.setAttribute('data-auto','1'); return; }
   var node = basis.pile ? basis.pile.querySelector('.card[data-index="'+value+'"]') : null;
-  if(!node){
+  if(!node){ var occ=cell.querySelector('.card'); if(occ && +occ.dataset.index!==value && basis && basis.pile){ basis.pile.appendChild(occ); }
     var elsewhere = document.querySelector('#basis-grid-left .card[data-index="'+value+'"], #basis-grid-right .card[data-index="'+value+'"]');
     if(elsewhere){
       var fromCell = elsewhere.closest('.cell');
@@ -552,7 +556,7 @@ function placeBasisAuto(targetPos, value){
   cell.setAttribute('data-auto','1');
   if(node){ cell.appendChild(node); } else { cell.appendChild(makeFaceDownPlaceholder(value)); }
 }
-function resetBasisCell(pos){ var cell=basisCellAt(pos); if(!cell) return; if(cell.getAttribute('data-auto')!=='1') return; var c=cell.querySelector('.card'); if(c){ basis.pile.appendChild(c); } cell.innerHTML=''; cell.classList.add('badge'); cell.setAttribute('data-pos', String(pos)); cell.setAttribute('data-auto','0'); }
+function resetBasisCell(pos){ var cell=basisCellAt(pos); if(!cell) return; var prev=cell.querySelector('.card'); if(prev && basis && basis.pile){ basis.pile.appendChild(prev); } if(cell.getAttribute('data-auto')!=='1') return; var c=cell.querySelector('.card'); if(c){ basis.pile.appendChild(c); } cell.innerHTML=''; cell.classList.add('badge'); cell.setAttribute('data-pos', String(pos)); cell.setAttribute('data-auto','0'); }
 function xorFromLower(mask){ var bases=[1,2,4,8,16,32].filter(function(b){return b<DECK;}); var acc=0, have=true; for(var i=0;i<bases.length;i++){ var b=bases[i]; if(mask & b){ var v=readBasisValue(b); if(v==null){ have=false; break; } acc ^= v; } } return have?acc:null; }
 function popcount(x){ var c=0; while(x){ c+=x&1; x>>=1; } return c; }
 function basisAutoFill(){ 
