@@ -51,7 +51,6 @@
     /* Light blue shadow when a card sits in a basis position */
     .card.basis-placed { box-shadow: 0 0 0 4px #c7d2fe; }
 
-
     /* Phi map */
     .phiCell{cursor:pointer}
     .phiA{outline:2px solid rgba(217,119,6,0.35); outline-offset:2px; box-shadow:0 0 0 2px rgba(217,119,6,0.10)}
@@ -73,9 +72,11 @@
     }
     
     .card.selected { outline:3px solid var(--brand); outline-offset:2px; }
-    .found-wrap { display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
+    .found-wrap { display:flex; flex-wrap:wrap; gap:8px; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
     .found-quad { display:flex; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:center; }
-    .mini { width: calc(var(--card-w) * 0.5); height: 30px; border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; }
+
+    /* 50% size for cards in the found quads section */
+    .mini .card { width: calc(var(--card-w) * 0.5); height: 30px; }
     .mini .front { display:flex !important; } /* minis always show */
     .mini .pic { gap: 1px; }
   </style>
@@ -212,15 +213,25 @@ function decodeBits(bits){
   var count={"00":1,"01":2,"10":3,"11":4}[bits.slice(4,6)];
   return {color:color,shape:shape,count:count};
 }
-function shapeSymbol(shape, color, mini) {
+function shapeSymbol(d, mini) {
+  // d.shape,d.color,d.count
   if (mini === undefined) mini=false; // default
-  var el = document.createElement('span');
-  el.className = 'shape';
-  el.style.color = color;
-  if (shape === 'circle') { el.style.fontSize = mini?'15px':'19px';  el.textContent = '●'; }
-  else if (shape === 'triangle') { el.style.fontSize = mini?'11px':'14px';  el.textContent = '▲'; }
-  else if (shape === 'square') { el.style.fontSize = mini?'9px':'12px';  el.textContent = '■'; }
-  else { el.style.fontSize = mini?'12px':'16px';  el.textContent = '♥'; }
+  var el = document.createElement('div');
+  el.className = 'pic';
+  el.style.color = d.color;
+  // lookup shape and size (mini vs normal)
+  var shapes = {
+    'circle':['●','15px','19px'],
+    'triangle':['▲','11px','13px'],
+    'square':['■','9px','12px'],
+    'heart':['♥','12px','16px']
+  };
+  var shape = shapes[d.shape] || ['x', '9px', '12px']; // fallback
+  //el.style.display = 'inline-block';
+  el.style.fontSize = mini?shape[1]:shape[2]
+  el.style.lineHeight = '12px';
+  el.style.verticalAlign = 'middle';
+  el.innerHTML = shape[0].repeat(d.count).trim()
   return el;
 }
 
@@ -291,25 +302,44 @@ function makeFront(n, mini){
   var bits=pad6(n), d=decodeBits(bits);
   var front=document.createElement('div'); 
   front.className='front';
-  var pic=document.createElement('div'); 
-  pic.className='pic';
-  for(var i=0;i<d.count;i++) pic.appendChild(shapeSymbol(d.shape,d.color,mini));
+  var pic = shapeSymbol(d,mini);
   var labels=document.createElement('div'); 
   labels.className='labels';
   front.appendChild(pic); 
   front.appendChild(labels);
   return front;
 }
+function makeBack(){
+  var back=document.createElement('div'); 
+  back.className='back';
+  back.textContent='●';
+  return back;
+}
 function makeCard(n){
   var cell=document.createElement('div'); 
   cell.className='cell';
   var card=document.createElement('div'); 
-  card.className='card'; card.dataset.index=n;
-  var front=makeFront(n);
-  var back=document.createElement('div'); back.className='back'; back.textContent='●';
-  card.appendChild(front); card.appendChild(back);
+  card.className='card'; 
+  card.dataset.index=n;
+  card.appendChild(makeFront(n)); 
+  card.appendChild(makeBack());
   card.addEventListener('click', function(){ card.classList.toggle('faceup'); updateUpCount(); updateDownstreamCounts(); buildPhiGridIfInit(); buildFindGridIfInit(); });
   cell.appendChild(card); return cell;
+}
+function makeMiniCard(n){
+  var mini=document.createElement('div'); 
+  mini.className='mini';
+  var card=document.createElement('div');
+  card.className='card';
+  card.appendChild(makeFront(n, true));  // mini=true
+  mini.appendChild(card);
+  return mini;
+}
+function makeFaceDownPlaceholder(n){ 
+  var ghost=makeBack();
+  ghost.className='backcard'; 
+  ghost.dataset.index=n; 
+  return ghost;
 }
 function buildDeck(){
   gridL.innerHTML=''; 
@@ -332,7 +362,20 @@ function wireSelectControls(){
   var reveal=byId('revealAll'), hide=byId('hideAll'), rnd=byId('randomN');
   if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
   if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
-  if(rnd) rnd.addEventListener('click', function(){ var n=parseInt(byId('nCount').value||'0',10); if(isNaN(n)||n<1) n=1; if(n>DECK) n=DECK; var picks=[]; var set={}; while(picks.length<n){ var r=Math.floor(Math.random()*DECK); if(!set[r]){ set[r]=1; picks.push(r);} } var cards=allCards(); for(var i=0;i<cards.length;i++){ if(picks.indexOf(i)!==-1) cards[i].classList.add('faceup'); else cards[i].classList.remove('faceup'); } updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(rnd) rnd.addEventListener('click', function(){
+    var n=parseInt(byId('nCount').value||'0',10);  // get number of randoms, default to '0'  
+    if(isNaN(n)||n<1) n=1; if(n>DECK) n=DECK;  // sanity check n
+    var set={}, count=0
+    while(count < n){
+      var r = Math.floor(Math.random() * (DECK + 1));
+      if(!set[r]) set[r]=1,count++;
+    }
+    var cards=allCards();
+    for(var i=0;i<cards.length;i++){ 
+      cards[i].classList.toggle('faceup', set[i]===1);
+    } 
+    updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); 
+  });
   deckSel.addEventListener('change', function(e){ DECK=parseInt(e.target.value,10); buildDeck(); basis.mappingComplete=false; basis.locked=false; basis.pos2val=null; basis.lockedPos2val=null; refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); updatePartitionDisables(); });
 }
 
@@ -532,7 +575,7 @@ function snapshotLayoutMapping(){
     basis.mappingComplete=true;
   }
 }
-function makeFaceDownPlaceholder(n){ var ghost=document.createElement('div'); ghost.className='backcard'; ghost.dataset.index=n; ghost.textContent='●'; return ghost; }
+
 function placeBasisAuto(targetPos, value){
   var cell=basisCellAt(targetPos); if(!cell) return;
   var already = cell.querySelector('.card[data-index="'+value+'"]');
@@ -745,7 +788,16 @@ function resetToStandardLayout(){
   if(basis && basis.pile){ basis.pile.innerHTML=''; }
   var msg = byId('basisResetMsg'); if(msg){ msg.textContent=''; }
 }
-function makeStaticCard(n){ var cell=document.createElement('div'); cell.className='cell'; var card=document.createElement('div'); card.className='card'; if(isFaceUp(n)) card.classList.add('faceup'); card.dataset.index=n; var front=makeFront(n); var back=document.createElement('div'); back.className='back'; back.textContent='●'; card.appendChild(front); card.appendChild(back); cell.appendChild(card); return cell; }
+function makeStaticCard(n){ 
+  var cell=document.createElement('div'); cell.className='cell'; 
+  var card=document.createElement('div'); card.className='card'; 
+  if(isFaceUp(n)) card.classList.add('faceup');
+  card.dataset.index=n; 
+  card.appendChild(makeFront(n)); 
+  card.appendChild(makeBack()); 
+  cell.appendChild(card); 
+  return cell;
+}
 function currentPositionMap(){ if(basis.locked && basis.lockedPos2val) return basis.lockedPos2val.slice(0); if(basis.mappingComplete && basis.pos2val) return basis.pos2val.slice(0); var m=[]; for(var i=0;i<DECK;i++) m[i]=i; return m; }
 function showPreBasisGrid(){ if(!basis.gridL||!basis.gridR) return; var map=currentPositionMap(); basis.gridL.innerHTML=''; basis.gridR.innerHTML=''; var divider=document.querySelector('.bin-divider'); if(DECK===64){ basis.gridL.className='grid c4x8'; basis.gridR.className='grid c4x8'; for(var i=0;i<32;i++) basis.gridL.appendChild(makeStaticCard(map[i])); for(var j=32;j<64;j++) basis.gridR.appendChild(makeStaticCard(map[j])); if(divider) divider.style.display='block'; } else if(DECK===32){ basis.gridL.className='grid c4x4'; basis.gridR.className='grid c4x4'; for(var a=0;a<16;a++) basis.gridL.appendChild(makeStaticCard(map[a])); for(var b=16;b<32;b++) basis.gridR.appendChild(makeStaticCard(map[b])); if(divider) divider.style.display='block'; } else { basis.gridL.className='grid single4x4'; basis.gridR.className='grid single4x4'; for(var c=0;c<16;c++) basis.gridL.appendChild(makeStaticCard(map[c])); if(divider) divider.style.display='none'; } byId('basisGridTitle').textContent='Grid (current positions)'; }
 function clearBasisSuggestMsg(){
@@ -1057,7 +1109,10 @@ function reconcileSuggestion(){ var s=basis.pile?basis.pile.querySelector('.card
 // ===== Phi Map =====
 var phi={ gridL:null, gridR:null, part:null, initialized:false, flowActive:false, selA:null, selB:null, lastPhi:null, quadsBefore:0, quadsAfter:0 };
 function buildPhiGridIfInit(){ if(phi.initialized) buildPhiGrid(); }
-function makePhiCard(n){ var cell=document.createElement('div'); cell.className='cell phiCell'; var card=document.createElement('div'); card.className='card'+(isFaceUp(n)?' faceup':''); card.dataset.index=n; card.appendChild(makeFront(n)); var back=document.createElement('div'); back.className='back'; back.textContent='●'; card.appendChild(back); cell.appendChild(card); return cell; }
+function makePhiCard(n){ var cell=document.createElement('div'); cell.className='cell phiCell'; var card=document.createElement('div'); card.className='card'+(isFaceUp(n)?' faceup':''); card.dataset.index=n; 
+  card.appendChild(makeFront(n)); 
+  card.appendChild(makeBack()); 
+  cell.appendChild(card); return cell; }
 function updatePhiQuadsDisplay(){ var beforeEl = byId('phiQuadBefore'); var afterEl = byId('phiQuadAfter'); if(beforeEl) beforeEl.textContent = String(phi.quadsBefore || 0); if(afterEl) afterEl.textContent = (phi.lastPhi ? String(phi.quadsAfter || 0) : ''); }
 function buildPhiGrid(){ if(!phi.gridL||!phi.gridR) return; phi.gridL.innerHTML=''; phi.gridR.innerHTML=''; if(!phi.lastPhi && !phi.flowActive){ phi.quadsBefore = String(computeQuadsBasic(getSelectedIndices())); }
   var map=currentPositionMap(); var dividerEls=document.querySelectorAll('.bin-divider'); var divider=dividerEls.length>1?dividerEls[1]:dividerEls[0]; var leftCount=(DECK===64?32:(DECK===32?16:DECK)); var gridClass=(DECK===64?'grid c4x8':(DECK===32?'grid c4x4':'grid single4x4')); phi.gridL.className=gridClass; phi.gridR.className=gridClass; phi.part = phi.part || (function(){ var sel=byId('phiPartition'); var mode; if(DECK===16){ mode='rowsdbl'; if(sel) sel.value='rowsdbl'; } else { mode = sel ? sel.value : 'lr'; } return buildPartition(mode); })(); for(var p=0;p<DECK;p++){ var v=map[p]; var cell=makePhiCard(v); cell.dataset.pos=String(p); if(phi.part && phi.part[p]==='A'){ cell.classList.add('phiA'); } else if(phi.part && phi.part[p]==='B'){ cell.classList.add('phiB'); } var target=(p<leftCount)?phi.gridL:phi.gridR; target.appendChild(cell); }
@@ -1067,7 +1122,44 @@ function reapplySelectedAB(){ if(phi.selA==null && phi.selB==null) return; funct
 function updatePartitionDisables(){ var sel=byId('phiPartition'); if(!sel) return; for(var i=0;i<sel.options.length;i++) sel.options[i].disabled=false; if(DECK===32){ var optTB=sel.querySelector('option[value="tb"]'); if(optTB) optTB.disabled=true; if(sel.value==='tb') sel.value='lr'; } if(DECK===16){ var optTB2=sel.querySelector('option[value="tb"]'); var optLR=sel.querySelector('option[value="lr"]'); if(optTB2) optTB2.disabled=true; if(optLR) optLR.disabled=true; if(sel.value==='tb'||sel.value==='lr') sel.value='rowsdbl'; } }
 function posRC(p){ var cols=4; var half=(DECK===64?32:(DECK===32?16:DECK)); var rowsPerSide=(DECK===64?8:4); var local=(DECK===16? p : (p<half? p : p-half)); var row=Math.floor(local/cols); var col=local%cols; return {row:row,col:col,rowsPerSide:rowsPerSide,side:(DECK===16?'L':(p<half?'L':'R'))}; }
 function buildPartition(mode){ var part=Array(DECK).fill(null); for(var p=0;p<DECK;p++){ var rc=posRC(p); var inA=false; if(mode==='lr'){ inA=(rc.side==='L'); } else if(mode==='tb'){ inA=(rc.row < rc.rowsPerSide/2); } else if(mode==='rowsdbl'){ inA=(Math.floor(rc.row/2)%2===0); } else if(mode==='colsdbl'){ inA=(Math.floor(rc.col/2)%2===0); } else if(mode==='rowsAlt'){ inA=(rc.row%2===0); } else if(mode==='colsAlt'){ inA=(rc.col%2===0); } part[p]=inA?'A':'B'; } return part; }
-function enhancePhiGrid(){ var map=currentPositionMap(); var leftCount=(DECK===64?32:(DECK===32?16:DECK)); var cellsL=Array.prototype.slice.call(byId('phi-grid-left').children); var cellsR=Array.prototype.slice.call(byId('phi-grid-right').children); function attach(cell,p){ var v=(p<map.length)? map[p]:null; var cardEl=cell.querySelector('.card'); var up=cardEl && cardEl.classList.contains('faceup'); cell.onclick=function(){ if(!phi.part) return; var isA=(phi.part[p]==='A'); var isB=!isA; if(phi.flowActive){ if(phi.selB==null){ if(isB && up){ phi.selB=v; cell.classList.add('phiSelectedB'); setPhiInfo('b = '+v+' ('+pad6(v)+'). Now pick a (face-down) from gold A.'); updateAHighlights(); } else { setPhiInfo('b must be FACE-UP in purple B.'); } } else if(phi.selA==null){ var up2=cardEl && cardEl.classList.contains('faceup'); if(isA && !up2){ phi.selA=v; cell.classList.add('phiSelectedA'); byId('phiApply').disabled=false; setPhiInfo('a = '+v+' ('+pad6(v)+'). Click Apply.'); updateAHighlights(); } else { setPhiInfo('a must be FACE-DOWN in gold A.'); } } } }; }
+function enhancePhiGrid(){ 
+  var map=currentPositionMap(); 
+  var leftCount=(DECK===64?32:(DECK===32?16:DECK)); 
+  var cellsL=Array.prototype.slice.call(byId('phi-grid-left').children); 
+  var cellsR=Array.prototype.slice.call(byId('phi-grid-right').children); 
+  function attach(cell,p){ 
+    var v=(p<map.length)? map[p]:null; 
+    var cardEl=cell.querySelector('.card'); 
+    var up=cardEl && cardEl.classList.contains('faceup'); 
+    cell.onclick=function(){ 
+      if(!phi.part) return; 
+      var isA=(phi.part[p]==='A'); 
+      var isB=!isA; 
+      if(phi.flowActive){ 
+        if(phi.selB==null){ 
+          if(isB && up){ 
+            phi.selB=v; 
+            cell.classList.add('phiSelectedB'); 
+            setPhiInfo('b = '+v+' ('+pad6(v)+'). Now pick a (face-down) from gold A.'); 
+            updateAHighlights();
+          } else { 
+            setPhiInfo('b must be FACE-UP in purple B.');
+          }
+        } else if(phi.selA==null){ 
+          var up2=cardEl && cardEl.classList.contains('faceup'); 
+          if(isA && !up2){ 
+            phi.selA=v; 
+            cell.classList.add('phiSelectedA'); 
+            byId('phiApply').disabled=false; 
+            setPhiInfo('a = '+v+' ('+pad6(v)+'). Click Apply.'); 
+            updateAHighlights();
+          } else { 
+            setPhiInfo('a must be FACE-DOWN in gold A.');
+          }
+        }
+      }
+    };
+  }
   for(var i=0;i<cellsL.length;i++) attach(cellsL[i], i);
   for(var j=0;j<cellsR.length;j++) attach(cellsR[j], leftCount+j);
 }
@@ -1139,11 +1231,11 @@ function buildFindGrid(){
   for(var p=0;p<DECK;p++){
     var v=map[p];
     var cell=document.createElement('div'); cell.className='cell';
-    var card=document.createElement('div'); card.className='card'; card.dataset.index=v;
+    var card=document.createElement('div'); card.className='card';
+    card.dataset.index=v;
     if(isFaceUp(v)) card.classList.add('faceup');
     card.appendChild(makeFront(v));
-    var back=document.createElement('div'); back.className='back'; back.textContent='●';
-    card.appendChild(back);
+    card.appendChild(makeBack());
     cell.appendChild(card);
     var target=(p<leftCount)?find.gridL:find.gridR;
     target.appendChild(cell);
@@ -1247,7 +1339,8 @@ function renderFoundList(){
   wrap.innerHTML='';
   for(var i=0;i<find.found.length;i++){
     var q=find.found[i];
-    var row=document.createElement('div'); row.className='found-quad';
+    var row=document.createElement('div'); 
+    row.className='found-quad';
     for(var j=0;j<q.length;j++){
       row.appendChild(makeMiniCard(q[j]));
     }
@@ -1294,14 +1387,6 @@ function hintOneQuad(){
   setFindMsg('No new quad to hint from current face-up cards.');
 }
 
-function makeMiniCard(n){
-  var c=document.createElement('div'); 
-  c.className='mini';
-  var front=makeFront(n, true);  // mini=true
-  front.classList.add('front');
-  c.appendChild(front);
-  return c;
-}
 function resetFoundList(){
   find.found.length=0;
   find.foundSet={};
