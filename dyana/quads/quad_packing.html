@@ -577,9 +577,19 @@ function snapshotLayoutMapping(){
 }
 
 function placeBasisAuto(targetPos, value){
-  var cell=basisCellAt(targetPos); if(!cell) return;
+  var cell=basisCellAt(targetPos); 
+  if(!cell) return;
   var already = cell.querySelector('.card[data-index="'+value+'"]');
-  if(already){ cell.setAttribute('data-auto','1'); return; }
+  if(already){ 
+    cell.setAttribute('data-auto','1'); 
+    return; 
+  }
+   // We are going to place a card here; if the cell currently has some other card,
+  // send that existing card back to the pile BEFORE clearing the cell.
+  var displaced = cell.querySelector('.card');
+  if (displaced && basis && basis.pile){
+    basis.pile.appendChild(displaced);    // ✅ return the replaced auto card to the pile
+  }
   var node = basis.pile ? basis.pile.querySelector('.card[data-index="'+value+'"]') : null;
   if(!node){ var occ=cell.querySelector('.card'); if(occ && +occ.dataset.index!==value && basis && basis.pile){ basis.pile.appendChild(occ); }
     var elsewhere = document.querySelector('#basis-grid-left .card[data-index="'+value+'"], #basis-grid-right .card[data-index="'+value+'"]');
@@ -1352,39 +1362,127 @@ function clearFindHints(){
   for(var i=0;i<cards.length;i++){ cards[i].classList.remove('hint'); }
 }
 function hintOneQuad(){
+  // Clear any previous yellow hint rings
   clearFindHints();
-  // candidate pool: current face-up cards (from the main grid state)
-  var ups = getSelectedIndices();
-  if(ups.length < 4){
+
+  // Universe = all face-up cards in the main state
+  var Uarr = getSelectedIndices();              // e.g., [6,7,10,11,14,15]
+  if (Uarr.length < 4){
     setFindMsg('Not enough face-up cards for a hint.');
     return;
   }
-  // try to find a quad not already in found list
-  var n = ups.length;
-  // simple combination search (n choose 4)
-  for(var a=0;a<n-3;a++){
-    for(var b=a+1;b<n-2;b++){
-      for(var c=b+1;c<n-1;c++){
-        for(var d=c+1;d<n;d++){
-          var combo = [ups[a], ups[b], ups[c], ups[d]];
-          if(!isQuad(combo)) continue;
-          var key = keyForQuad(combo);
-          if(find.foundSet[key]) continue;
-          // highlight these four in the find grid
-          for(var k=0;k<4;k++){
-            var v = combo[k];
-            var el = document.querySelector('#find-grid-left .card[data-index="'+v+'"], #find-grid-right .card[data-index="'+v+'"]');
-            if(el) el.classList.add('hint');
+  // Quick lookup for "is this face-up?"
+  var Uset = {};
+  for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
+
+  // Selected (blue outline) cards in the Find tab
+  var S = (find && Array.isArray(find.selected)) ? find.selected.slice() : [];
+  // Ensure they’re all face-up
+  S = S.filter(function(x){ return Uset[x]; });
+
+  // Helpers
+  function validQuad(a,b,c,d){
+    if (a===b || a===c || a===d || b===c || b===d || c===d) return false;
+    if (!(a in Uset) || !(b in Uset) || !(c in Uset) || !(d in Uset)) return false;
+    // XOR=0 (uses your deck mask implicitly via indices in Uset)
+    return ((a ^ b ^ c ^ d) === 0);
+  }
+  function notAlreadyFound(q){
+    var key = keyForQuad(q);          // canonical 4-set key
+    return !(find && find.foundSet && find.foundSet[key]);
+  }
+  function hintCards(Q){
+    for (var k=0;k<4;k++){
+      var v = Q[k];
+      var el = document.querySelector(
+        '#find-grid-left .card[data-index="'+v+'"], ' +
+        '#find-grid-right .card[data-index="'+v+'"]'
+      );
+      if (el) el.classList.add('hint');
+    }
+    setTimeout(clearFindHints, 2500);
+  }
+
+  // ===== Case 0 selected: fall back to ANY new quad among face-up cards =====
+  if (S.length === 0){
+    var n = Uarr.length;
+    for (var a=0; a<n-3; a++){
+      for (var b=a+1; b<n-2; b++){
+        for (var c=b+1; c<n-1; c++){
+          for (var d=c+1; d<n; d++){
+            var quad = [Uarr[a], Uarr[b], Uarr[c], Uarr[d]];
+            if (!validQuad(quad[0], quad[1], quad[2], quad[3])) continue;
+            if (!notAlreadyFound(quad)) continue;   // skip already-found
+            hintCards(quad);
+            setFindMsg('Hint: these four form a quad.');
+            return;
           }
-          setFindMsg('Hint: these four form a quad.');
-          // auto clear after a short delay
-          setTimeout(clearFindHints, 2500);
+        }
+      }
+    }
+    setFindMsg('No new quad to hint from current face-up cards.');
+    return;
+  }
+
+  // ===== Case 3+ selected: try every 3-subset; the 4th is a^b^c =====
+  if (S.length >= 3){
+    for (var i1=0;i1<S.length;i1++){
+      for (var j1=i1+1;j1<S.length;j1++){
+        for (var k1=j1+1;k1<S.length;k1++){
+          var a3=S[i1], b3=S[j1], c3=S[k1];
+          var d3=(a3^b3^c3);
+          var quad3=[a3,b3,c3,d3];
+          if (validQuad(a3,b3,c3,d3) && notAlreadyFound(quad3)){
+            hintCards(quad3);
+            setFindMsg('Hint: completed a quad from your selected cards.');
+            return;
+          }
+        }
+      }
+    }
+    setFindMsg('No new quad uses those highlighted cards.');
+    return;
+  }
+
+  // ===== Case 2 selected: scan any face-up c to complete a quad =====
+  if (S.length === 2){
+    var a2=S[0], b2=S[1];
+    for (var i2=0;i2<Uarr.length;i2++){
+      var c2=Uarr[i2];
+      if (c2===a2 || c2===b2) continue;
+      var d2=(a2^b2^c2);
+      var quad2=[a2,b2,c2,d2];
+      if (validQuad(a2,b2,c2,d2) && notAlreadyFound(quad2)){
+        hintCards(quad2);
+        setFindMsg('Hint: found a quad that uses your 2 highlighted cards.');
+        return;
+      }
+    }
+    setFindMsg('No new quad uses those two highlighted cards.');
+    return;
+  }
+
+  // ===== Case 1 selected: scan face-up pairs (b,c) to complete a quad =====
+  if (S.length === 1){
+    var a1=S[0];
+    for (var i3=0;i3<Uarr.length;i3++){
+      var b1=Uarr[i3];
+      if (b1===a1) continue;
+      for (var j3=i3+1;j3<Uarr.length;j3++){
+        var c1=Uarr[j3];
+        if (c1===a1) continue;
+        var d1=(a1^b1^c1);
+        var quad1=[a1,b1,c1,d1];
+        if (validQuad(a1,b1,c1,d1) && notAlreadyFound(quad1)){
+          hintCards(quad1);
+          setFindMsg('Hint: found a quad that uses your highlighted card.');
           return;
         }
       }
     }
+    setFindMsg('No new quad uses that highlighted card.');
+    return;
   }
-  setFindMsg('No new quad to hint from current face-up cards.');
 }
 
 function resetFoundList(){
