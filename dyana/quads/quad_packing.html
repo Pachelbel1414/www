@@ -63,6 +63,12 @@
     .pile .pic { gap: 1px; }
 
     /* --- Find Quads --- */
+    .card.hint { box-shadow: 0 0 0 3px #fbbf24; animation: hintPulse 0.9s ease-in-out 3 alternate; }
+    @keyframes hintPulse {
+      0% { transform: scale(1.0); }
+      100% { transform: scale(1.04); }
+    }
+    
     .card.selected { outline:3px solid var(--brand); outline-offset:2px; }
     .found-wrap { display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
     .found-quad { display:flex; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:center; }
@@ -171,6 +177,7 @@
         <span class="pill">
           <button id="findClearSel">Clear selection</button>
           <button id="findResetList">Reset found list</button>
+          <button id="findHint">Hint</button>
         </span>
       </div>
 
@@ -1112,6 +1119,7 @@ function initFindTab(){
   find.gridR = byId('find-grid-right');
   byId('findClearSel').onclick = clearFindSelection;
   byId('findResetList').onclick = resetFoundList;
+  byId('findHint').onclick = hintOneQuad;
   find.initialized = true;
   buildFindGrid();
   updateFindCounts();
@@ -1242,6 +1250,46 @@ function renderFoundList(){
     wrap.appendChild(row);
   }
 }
+function clearFindHints(){
+  var cards = document.querySelectorAll('#find-grid-left .card.hint, #find-grid-right .card.hint');
+  for(var i=0;i<cards.length;i++){ cards[i].classList.remove('hint'); }
+}
+function hintOneQuad(){
+  clearFindHints();
+  // candidate pool: current face-up cards (from the main grid state)
+  var ups = getSelectedIndices();
+  if(ups.length < 4){
+    setFindMsg('Not enough face-up cards for a hint.');
+    return;
+  }
+  // try to find a quad not already in found list
+  var n = ups.length;
+  // simple combination search (n choose 4)
+  for(var a=0;a<n-3;a++){
+    for(var b=a+1;b<n-2;b++){
+      for(var c=b+1;c<n-1;c++){
+        for(var d=c+1;d<n;d++){
+          var combo = [ups[a], ups[b], ups[c], ups[d]];
+          if(!isQuad(combo)) continue;
+          var key = keyForQuad(combo);
+          if(find.foundSet[key]) continue;
+          // highlight these four in the find grid
+          for(var k=0;k<4;k++){
+            var v = combo[k];
+            var el = document.querySelector('#find-grid-left .card[data-index="'+v+'"], #find-grid-right .card[data-index="'+v+'"]');
+            if(el) el.classList.add('hint');
+          }
+          setFindMsg('Hint: these four form a quad.');
+          // auto clear after a short delay
+          setTimeout(clearFindHints, 2500);
+          return;
+        }
+      }
+    }
+  }
+  setFindMsg('No new quad to hint from current face-up cards.');
+}
+
 function makeMiniCard(n){
   var c=document.createElement('div'); 
   c.className='mini';
