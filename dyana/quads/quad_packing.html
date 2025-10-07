@@ -48,6 +48,8 @@
 
     .labels{display:none}
     .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; justify-content:center; justify-items:center; gap:4px; align-items:center; width:100%; }
+    /* try to use a consistent font across devices for symbols */
+    .pic { font-family: "Segoe UI Symbol", "Noto Sans Symbols", "Arial Unicode MS", sans-serif; }
 
     /* Basis/Layout */
     .pile{display:flex;flex-wrap:wrap;gap:8px;min-height:124px;padding:8px;border:1px dashed var(--border);border-radius:12px;background:#fff}
@@ -219,10 +221,11 @@ function shapeSymbol(d, mini) {
   el.style.color = d.color;
   // lookup shape and size (mini vs normal)
   var shapes = {
-    'circle':['●','15px','19px'],
-    'triangle':['▲','11px','13px'],
+    'circle':['●','9px','12px'],
+    'triangle':['▲','9px','12px'],
     'square':['■','9px','12px'],
-    'heart':['♥','12px','16px']
+    'heart':['♥','12px','15px']
+
   };
   var shape = shapes[d.shape] || ['x', '9px', '12px']; // fallback
   el.style.fontSize = mini?shape[1]:shape[2]
