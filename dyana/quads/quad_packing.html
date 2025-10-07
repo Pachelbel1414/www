@@ -5,7 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Quads</title>
   <style>
-    :root{ --bg:#fafafa; --ink:#111; --muted:#6b7280; --brand:#2563eb; --gold:#b45309; --purple:#6d28d9; --border:#e5e7eb; --card:#fff; --card-w: 100px; }
+    :root{ --bg:#fafafa; --ink:#111; --muted:#6b7280; --brand:#2563eb; --gold:#b45309; --purple:#6d28d9; --border:#e5e7eb; }
+
+    /* variables controlling card size */
+    :root{ --card-h: 60px; --card-w: 100px; --card-r: 10px; --card-bg:#fff; }
+
+    /* When screen width ≤ 600px (e.g. phones) */
+    @media (max-width: 600px) {
+      :root { --card-h: 40px;  --card-w: 70px; --card-r: 7px; }
+    }
+
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .app{max-width:1100px;margin:0 auto;padding:16px}
@@ -24,17 +33,19 @@
     button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
 
     .bin-container{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
-    .bin-side{flex:1;min-width:420px}
+    .bin-side{flex:1}
 
     .grid{display:grid;gap:8px;grid-template-columns:repeat(4, var(--card-w)); justify-content:center}
 
-    .cell{border-radius:10px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:10px;height:60px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer;width:var(--card-w)}
+    .cell{border-radius:var(--card-r)}
+    .card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--card-r);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer;height:var(--card-h);width:var(--card-w)}
+
     /* FRONT hidden unless face-up */
-    .front{display:none !important; justify-content:center; width:100%;}
+    .front{display:none; justify-content:center; width:100%;}
     .card.faceup .front{display:flex !important}
-    .back{display:flex;align-items:center;justify-content:center;flex:1;color:#9ca3af}
-    .card.faceup .back{display:none}
+    .back{display:flex; justify-content:center; width:100%;}
+    .card.faceup .back{display:none !important}
+
     .labels{display:none}
     .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; justify-content:center; justify-items:center; gap:4px; align-items:center; width:100%; }
 
@@ -43,7 +54,6 @@
     .badge{border:2px dashed #e5e7eb;min-height:60px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fff}
     .badge.basis{border-color:#c7d2fe;background:#eef2ff}
     .drop-ok{outline:3px solid var(--brand);outline-offset:2px}
-    .backcard{background:var(--card);border:1px solid var(--border);border-radius:10px;height:60px;display:flex;align-items:center;justify-content:center;color:#9ca3af;width:var(--card-w)}
     .suggested{ box-shadow: inset 0 0 0 3px var(--brand); }
     /* Light blue shadow when a card sits in a basis position */
     .card.basis-placed { box-shadow: 0 0 0 4px #c7d2fe; }
@@ -57,8 +67,7 @@
     .a-shadow{outline:3px solid rgba(217,119,6,0.7); outline-offset:2px; box-shadow:0 0 0 3px rgba(217,119,0,0.18)}
 
     /* 50% size for cards in the Selected Pile */
-    .pile .card { width: calc(var(--card-w) * 0.5); height: 30px; }
-    .pile .backcard { width: calc(var(--card-w) * 0.5); height: 30px; }
+    .pile .card { width: calc(var(--card-w) * 0.5); height: calc(var(--card-h) * 0.5); }
     .pile .pic { gap: 1px; }
 
     /* --- Find Quads --- */
@@ -73,7 +82,7 @@
     .found-quad { display:flex; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:center; }
 
     /* 50% size for cards in the found quads section */
-    .mini .card { width: calc(var(--card-w) * 0.5); height: 30px; }
+    .mini.card { width: calc(var(--card-w) * 0.5); height: calc(var(--card-h) * 0.5); }
     .mini .front { display:flex !important; } /* minis always show */
     .mini .pic { gap: 1px; }
   </style>
@@ -314,6 +323,7 @@ function makeBack(){
   var back=document.createElement('div'); 
   back.className='back';
   back.textContent='●';
+  back.style.color = '#9ca3af';
   back.style.fontSize = '12px';
   back.style.lineHeight = '12px';
   back.style.verticalAlign = 'middle';
@@ -333,18 +343,9 @@ function makeCard(n){
 }
 function makeMiniCard(n){
   var mini=document.createElement('div'); 
-  mini.className='mini';
-  var card=document.createElement('div');
-  card.className='card';
-  card.appendChild(makeFront(n, true));  // mini=true
-  mini.appendChild(card);
+  mini.className='mini card';
+  mini.appendChild(makeFront(n, true));  // mini=true
   return mini;
-}
-function makeFaceDownPlaceholder(n){ 
-  var ghost=makeBack();
-  ghost.className='backcard'; 
-  ghost.dataset.index=n; 
-  return ghost;
 }
 function buildDeck(){
   if(!gridL || !gridR){ return; }
@@ -476,7 +477,7 @@ function makeBasisCard(n){
   var d=document.createElement('div'); 
   d.className='card faceup'; 
   d.dataset.index=n; 
-  d.appendChild(makeFront(n)); 
+  d.appendChild(makeFront(n));
   d.setAttribute('draggable','true'); 
   d.addEventListener('dragstart', function(e){ 
     e.dataTransfer.effectAllowed='move'; 
@@ -491,7 +492,13 @@ function makeBasisCard(n){
   }); 
   return d;
 }
-function basisCellAt(pos){ var rightStart=(DECK===64?32:(DECK===32?16:Infinity)); if(pos<rightStart) return basis.gridL.children[pos]||null; if(pos>=rightStart && rightStart!==Infinity) return basis.gridR.children[pos-rightStart]||null; return null; }
+function basisCellAt(pos){
+  if(pos<0||pos>DECK) return null;
+  if(!basis||!basis.gridL||!basis.gridR) return;
+  var rightStart=(DECK===64?32:(DECK===32?16:Infinity)); 
+  if(pos<rightStart) return basis.gridL.children[pos]||null; 
+  return basis.gridR.children[pos-rightStart]||null;
+}
 function buildBasisGrid(){ 
   if(!basis||!basis.gridL||!basis.gridR) return; 
   basis.gridL.innerHTML=''; 
@@ -512,7 +519,7 @@ function refreshBasisPile(){
   if(!basis||!basis.pile) return; 
   var sel=getSelectedIndicesUniqueSorted(); 
   basis.pile.innerHTML=''; 
-  for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i]));
+  for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i], true));
   updateBasisStats();
 }
 function enableBasisDnD(){ 
@@ -542,7 +549,12 @@ function enableBasisDnD(){
         } 
       }
       if(!node) return; 
-      var prev=cell.querySelector('.card');if(prev && basis && basis.pile){ prev.classList.remove('basis-placed','suggested'); basis.pile.appendChild(prev); }cell.innerHTML=''; 
+      var prev=cell.querySelector('.card');
+      if(prev && basis && basis.pile){ 
+        prev.classList.remove('basis-placed','suggested'); 
+        basis.pile.appendChild(prev);
+      }
+      cell.innerHTML=''; 
       cell.classList.add('badge'); 
       cell.setAttribute('data-pos', String(pos)); 
       cell.setAttribute('data-auto','0'); 
@@ -643,7 +655,7 @@ function placeBasisAuto(targetPos, value){
   cell.classList.add('badge');
   cell.setAttribute('data-pos', String(targetPos));
   cell.setAttribute('data-auto','1');
-  if(node){ cell.appendChild(node); } else { cell.appendChild(makeFaceDownPlaceholder(value)); }
+  if(node){ cell.appendChild(node); }
 }
 function resetBasisCell(pos){ var cell=basisCellAt(pos); if(!cell) return; var prev=cell.querySelector('.card'); if(prev && basis && basis.pile){ basis.pile.appendChild(prev); } if(cell.getAttribute('data-auto')!=='1') return; var c=cell.querySelector('.card'); if(c){ basis.pile.appendChild(c); } cell.innerHTML=''; cell.classList.add('badge'); cell.setAttribute('data-pos', String(pos)); cell.setAttribute('data-auto','0'); }
 function xorFromLower(mask){ var bases=[1,2,4,8,16,32].filter(function(b){return b<DECK;}); var acc=0, have=true; for(var i=0;i<bases.length;i++){ var b=bases[i]; if(mask & b){ var v=readBasisValue(b); if(v==null){ have=false; break; } acc ^= v; } } return have?acc:null; }
