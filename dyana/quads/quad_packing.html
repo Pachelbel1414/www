@@ -316,10 +316,11 @@ function makeFront(n){
 function makeBack(){
   var back=document.createElement('div'); 
   back.className='back';
-  back.textContent='●';
+  //back.textContent='ℚ';  //'●';
+  back.innerHTML='&Qopf;';
   back.style.color = '#9ca3af';
-  back.style.fontSize = '12px';
-  back.style.lineHeight = '12px';
+  back.style.fontSize = '22px';
+  back.style.lineHeight = '22px';
   back.style.verticalAlign = 'middle';
   return back;
 }
