@@ -48,12 +48,12 @@
 
     .labels{display:none}
 
-    .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; gap:4px; justify-content:center; justify-items:center; align-items:center; width:100%; }
+    .pic { display:flex; justify-content:center; width:100%; }
     /* try to use a consistent font across devices for symbols */
-    .pic { font-family: "Segoe UI Symbol", "Noto Sans Symbols", "Arial Unicode MS", sans-serif; }
+    .pic { font-family: "Times New Roman", "Segoe UI Symbol", "Noto Sans Symbols", "Arial Unicode MS", sans-serif; }
     .pic { font-size:12px; line-height:12px; vertical-align:middle; }
-    .mini .pic { font-size:9px; gap:1px; }
-    .pile .pic { font-size:9px; gap:1px; }
+    .mini .pic { font-size:9px; }
+    .pile .pic { font-size:9px; }
 
     /* Basis/Layout */
     .pile{display:flex;flex-wrap:wrap;gap:8px;min-height:124px;padding:8px;border:1px dashed var(--border);border-radius:12px;background:#fff}
@@ -221,6 +221,7 @@ function shapeSymbol(d) {
   var el = document.createElement('div');
   el.className = 'pic';
   el.style.color = d.color;
+  if (d.shape=='▲') el.style.letterSpacing = '-3px';  // triangle man, triangle man
   el.innerHTML = d.shape.repeat(d.count).trim()
   return el;
 }
