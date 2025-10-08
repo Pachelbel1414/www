@@ -307,7 +307,9 @@ function computeQuadsBasic(indices){
 function updateUpCount(){
   var up=getFaceUpCount();
   if (upCountEl) upCountEl.textContent = up + ' / ' + DECK;
-  var qEl = byId('selectQuadCount'); if(qEl){ qEl.textContent = String(computeQuadsBasic(getSelectedIndices())); }
+  var qEl = byId('selectQuadCount'); 
+  if(qEl){ qEl.textContent = String(computeQuadsBasic(getSelectedIndices())); 
+  }
   if (typeof find!=='undefined' && find.initialized) { updateFindCounts(); }
 }
 function makeFront(n, mini){
@@ -385,7 +387,7 @@ function wireSelectControls(){
     if(isNaN(n)||n<1) n=1; if(n>DECK) n=DECK;  // sanity check n
     var set={}, count=0
     while(count < n){
-      var r = Math.floor(Math.random() * (DECK + 1));
+      var r = Math.floor(Math.random() * (DECK ));
       if(!set[r]) set[r]=1,count++;
     }
     var cards=allCards();
@@ -398,6 +400,8 @@ function wireSelectControls(){
 }
 
 // Tabs
+
+
 var tabs=[];
 function activateTab(tabId){
   for(var k=0;k<tabs.length;k++){
