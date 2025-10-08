@@ -47,9 +47,13 @@
     .card.faceup .back{display:none !important}
 
     .labels{display:none}
-    .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; justify-content:center; justify-items:center; gap:4px; align-items:center; width:100%; }
+
+    .pic { display:grid; grid-auto-flow:column; grid-auto-columns:auto; gap:4px; justify-content:center; justify-items:center; align-items:center; width:100%; }
     /* try to use a consistent font across devices for symbols */
     .pic { font-family: "Segoe UI Symbol", "Noto Sans Symbols", "Arial Unicode MS", sans-serif; }
+    .pic { font-size:12px; line-height:12px; vertical-align:middle; }
+    .mini .pic { font-size:9px; gap:1px; }
+    .pile .pic { font-size:9px; gap:1px; }
 
     /* Basis/Layout */
     .pile{display:flex;flex-wrap:wrap;gap:8px;min-height:124px;padding:8px;border:1px dashed var(--border);border-radius:12px;background:#fff}
@@ -70,7 +74,6 @@
 
     /* 50% size for cards in the Selected Pile */
     .pile .card { width: calc(var(--card-w) * 0.5); height: calc(var(--card-h) * 0.5); }
-    .pile .pic { gap: 1px; }
 
     /* --- Find Quads --- */
     .card.hint { box-shadow: 0 0 0 3px #fbbf24; animation: hintPulse 0.9s ease-in-out 3 alternate; }
@@ -84,9 +87,8 @@
     .found-quad { display:flex; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:center; }
 
     /* 50% size for cards in the found quads section */
-    .mini.card { width: calc(var(--card-w) * 0.5); height: calc(var(--card-h) * 0.5); }
+    .mini .card { width: calc(var(--card-w) * 0.5); height: calc(var(--card-h) * 0.5); }
     .mini .front { display:flex !important; } /* minis always show */
-    .mini .pic { gap: 1px; }
   </style>
 </head>
 <body>
@@ -133,7 +135,9 @@
         <button id="basisStartNew" class="primary">Create new basis</button>
         <button id="basisSuggest0">Suggest 0</button>
         <button id="basisSuggestNext">Suggest next</button>
-        <div class="basis-msg"><span id="basisSuggest0Msg" class="muted"></span><span id="basisSuggestNextMsg" class="muted"></span><span id="basisResetMsg" class="muted"></span></div>
+        <div class="basis-msg">
+          <span id="basisMsg" class="muted"></span>
+        </div>
         </span>
         <button id="basisResetLayout">Return to Standard Layout</button>
         <span class="pill"><span class="muted">Face-up</span> <strong id="basisUpCount">0</strong></span>
@@ -203,35 +207,21 @@
 // ---------- Utilities ----------
 function byId(id){ return document.getElementById(id); }
 function pad6(n){
-  if (!n) return '000000';
-  var s = n.toString(2);
+  var s = (n||0).toString(2);
   return ('000000' + s).slice(-6);
 }
 function decodeBits(bits){
   var color={"00":"#ef4444","01":"#10b981","10":"#f59e0b","11":"#3b82f6"}[bits.slice(0,2)];
-  var shape={"00":"circle","01":"triangle","10":"square","11":"heart"}[bits.slice(2,4)];
+  var shape={"00":'●',"01":'▲',"10":'■',"11":'♥'}[bits.slice(2,4)];
   var count={"00":1,"01":2,"10":3,"11":4}[bits.slice(4,6)];
   return {color:color,shape:shape,count:count};
 }
-function shapeSymbol(d, mini) {
+function shapeSymbol(d) {
   // d.shape,d.color,d.count
-  if (mini === undefined) mini=false; // default
   var el = document.createElement('div');
   el.className = 'pic';
   el.style.color = d.color;
-  // lookup shape and size (mini vs normal)
-  var shapes = {
-    'circle':['●','9px','12px'],
-    'triangle':['▲','9px','12px'],
-    'square':['■','9px','12px'],
-    'heart':['♥','12px','15px']
-
-  };
-  var shape = shapes[d.shape] || ['x', '9px', '12px']; // fallback
-  el.style.fontSize = mini?shape[1]:shape[2]
-  el.style.lineHeight = '12px';
-  el.style.verticalAlign = 'middle';
-  el.innerHTML = shape[0].repeat(d.count).trim()
+  el.innerHTML = d.shape.repeat(d.count).trim()
   return el;
 }
 
@@ -312,12 +302,11 @@ function updateUpCount(){
   }
   if (typeof find!=='undefined' && find.initialized) { updateFindCounts(); }
 }
-function makeFront(n, mini){
-  if (mini === undefined) mini=false; // default
+function makeFront(n){
   var bits=pad6(n), d=decodeBits(bits);
   var front=document.createElement('div'); 
   front.className='front';
-  var pic = shapeSymbol(d,mini);
+  var pic=shapeSymbol(d);
   var labels=document.createElement('div'); 
   labels.className='labels';
   front.appendChild(pic); 
@@ -348,8 +337,11 @@ function makeCard(n){
 }
 function makeMiniCard(n){
   var mini=document.createElement('div'); 
-  mini.className='mini card';
-  mini.appendChild(makeFront(n, true));  // mini=true
+  mini.className='mini';
+  var card=document.createElement('div'); 
+  card.className='card'; 
+  card.appendChild(makeFront(n));
+  mini.appendChild(card); 
   return mini;
 }
 function buildDeck(){
@@ -396,12 +388,21 @@ function wireSelectControls(){
     } 
     updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); 
   });
-  deckSel.addEventListener('change', function(e){ DECK=parseInt(e.target.value,10); buildDeck(); basis.mappingComplete=false; basis.locked=false; basis.pos2val=null; basis.lockedPos2val=null; refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); updatePartitionDisables(); });
+  deckSel.addEventListener('change', function(e){ 
+    DECK=parseInt(e.target.value,10); 
+    buildDeck(); 
+    basis.mappingComplete=false; 
+    basis.pos2val=null; 
+    basis.lockedPos2val=null; 
+    refreshIfOnLayout(); 
+    buildPhiGridIfInit(); 
+    buildFindGridIfInit(); 
+    updatePartitionDisables();
+    resetFoundList();
+  });
 }
 
 // Tabs
-
-
 var tabs=[];
 function activateTab(tabId){
   for(var k=0;k<tabs.length;k++){
@@ -463,7 +464,7 @@ function init(){
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 
 // ===== Basis/Layout =====
-var basis={ pile:null, gridL:null, gridR:null, suggestedIndex:null, pos2val:null, val2pos:null, mappingComplete:false, locked:false, lockedPos2val:null };
+var basis={ pile:null, gridL:null, gridR:null, suggestedIndex:null, pos2val:null, val2pos:null, mappingComplete:false, lockedPos2val:null };
 
 function ensureInitBasisTab(){
   if(!basis.pile){
@@ -488,7 +489,7 @@ function makeBasisCard(n){
   d.setAttribute('draggable','true'); 
   d.addEventListener('dragstart', function(e){ 
     e.dataTransfer.effectAllowed='move'; 
-    e.dataTransfer.setData('text/plain', String(n)); 
+    e.dataTransfer.setData('data-index', String(n)); 
     var p=d.closest('.cell'); 
     if(p && p.hasAttribute('data-pos')){ 
       e.dataTransfer.setData('from','grid'); 
@@ -526,7 +527,7 @@ function refreshBasisPile(){
   if(!basis||!basis.pile) return; 
   var sel=getSelectedIndicesUniqueSorted(); 
   basis.pile.innerHTML=''; 
-  for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i], true));
+  for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i]));
   updateBasisStats();
 }
 function enableBasisDnD(){ 
@@ -539,7 +540,7 @@ function enableBasisDnD(){
     cell.addEventListener('drop', function(e){ 
       e.preventDefault(); 
       cell.classList.remove('drop-ok'); 
-      var idx=parseInt(e.dataTransfer.getData('text/plain'),10); 
+      var idx=parseInt(e.dataTransfer.getData('data-index'),10); 
       var from=e.dataTransfer.getData('from'); 
       var node=null; 
       if(from==='pile'){ 
@@ -569,7 +570,7 @@ function enableBasisDnD(){
       cell.appendChild(node); 
       basisAutoFill(); 
       clearSuggested();
-      scheduleClearBasisMsgOnNextClick(); 
+      scheduleclearBasisMsgOnNextClick(); 
       checkAndLockPositions();
     }); 
   }); 
@@ -588,7 +589,7 @@ function enableBasisDnD(){
         src.setAttribute('data-auto','0'); 
       } 
       basisAutoFill(); 
-      clearBasisSuggestMsg();
+      clearBasisMsg();
     }
   });
 }
@@ -639,11 +640,11 @@ function placeBasisAuto(targetPos, value){
     cell.setAttribute('data-auto','1'); 
     return; 
   }
-   // We are going to place a card here; if the cell currently has some other card,
+  // We are going to place a card here; if the cell currently has some other card,
   // send that existing card back to the pile BEFORE clearing the cell.
   var displaced = cell.querySelector('.card');
   if (displaced && basis && basis.pile){
-    basis.pile.appendChild(displaced);    // ✅ return the replaced auto card to the pile
+    basis.pile.appendChild(displaced);    // return the replaced auto card to the pile
   }
   var node = basis.pile ? basis.pile.querySelector('.card[data-index="'+value+'"]') : null;
   if(!node){ var occ=cell.querySelector('.card'); if(occ && +occ.dataset.index!==value && basis && basis.pile){ basis.pile.appendChild(occ); }
@@ -806,7 +807,6 @@ function initBasisTab(){
   basis.pile=byId('basisPile');
   basis.gridL=byId('basis-grid-left');
   basis.gridR=byId('basis-grid-right');
-  basis.locked=true;
   showPreBasisGrid();
   basis.pile.innerHTML='';
   updateBasisStats();
@@ -817,14 +817,19 @@ function initBasisTab(){
   if(byId('basisSuggest0')) byId('basisSuggest0').disabled = true;
   if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = true;
 }
-function refreshBasisEverything(){ if(!basis.locked){ buildBasisGrid(); refreshBasisPile(); basisAutoFill(); } else { showPreBasisGrid(); updateBasisStats(); } }
+function refreshBasisEverything(){ 
+  if(!basis.mappingComplete){ 
+    buildBasisGrid(); refreshBasisPile(); basisAutoFill();
+  } else { 
+    showPreBasisGrid(); updateBasisStats();
+  }
+}
 function applyMappingToSelect(useLocked){ if(useLocked===void 0) useLocked=false; var map=(useLocked && basis.lockedPos2val)? basis.lockedPos2val : basis.pos2val; if(!map) return; var half=(DECK===64?32:(DECK===32?16:DECK)); for(var p=0;p<DECK;p++){ var val=map[p]; var card=getCardEl(val); if(!card) continue; var targetGrid=(p<half)? gridL : gridR; targetGrid.appendChild(card.closest('.cell')); } }
 function checkAndLockPositions(){ 
-  clearBasisSuggestMsg();
+  clearBasisMsg();
   snapshotLayoutMapping();
   if(!basis.mappingComplete){ return; }
   basis.lockedPos2val = basis.pos2val.slice(0);
-  basis.locked = true;
   applyMappingToSelect(true);
   buildPhiGridIfInit();
   showPreBasisGrid();
@@ -833,23 +838,21 @@ function checkAndLockPositions(){
   if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = true;
   updateBasisStats();
   updateDownstreamCounts();
-  var m=byId('basisResetMsg'); 
-  if(m) m.textContent='Basis locked: layout applied to all tabs.';
+  setBasisMsg('Basis locked: layout applied to all tabs.');
 }
 function resetToStandardLayout(){ 
-  clearBasisSuggestMsg();
-  var map=[]; for(var i=0;i<DECK;i++) map[i]=i;
+  var map=[]; 
+  for(var i=0;i<DECK;i++) map[i]=i;
   basis.pos2val = map.slice();
   basis.val2pos = map.slice();
-  basis.mappingComplete = true;
   basis.lockedPos2val = map.slice();
-  basis.locked = true;
+  basis.mappingComplete = true;
   applyMappingToSelect(true);
   showPreBasisGrid();
   updateBasisStats();
   buildPhiGridIfInit();
   if(basis && basis.pile){ basis.pile.innerHTML=''; }
-  var msg = byId('basisResetMsg'); if(msg){ msg.textContent=''; }
+  clearBasisMsg();
 }
 function makeStaticCard(n){ 
   var cell=document.createElement('div'); cell.className='cell'; 
@@ -861,7 +864,13 @@ function makeStaticCard(n){
   cell.appendChild(card); 
   return cell;
 }
-function currentPositionMap(){ if(basis.locked && basis.lockedPos2val) return basis.lockedPos2val.slice(0); if(basis.mappingComplete && basis.pos2val) return basis.pos2val.slice(0); var m=[]; for(var i=0;i<DECK;i++) m[i]=i; return m; }
+function currentPositionMap(){ 
+  if(basis.mappingComplete && basis.lockedPos2val) return basis.lockedPos2val.slice(0); 
+  if(basis.mappingComplete && basis.pos2val) return basis.pos2val.slice(0); 
+  var m=[]; 
+  for(var i=0;i<DECK;i++) m[i]=i; 
+  return m;
+}
 function showPreBasisGrid(){ 
   if(!basis.gridL||!basis.gridR) return; 
   var map=currentPositionMap(); 
@@ -878,16 +887,15 @@ function showPreBasisGrid(){
   } 
   byId('basisGridTitle').textContent='Grid (current positions)';
 }
-function clearBasisSuggestMsg(){
-  var m = byId('basisSuggestMsg'); if(m) m.textContent = '';
-  var m0 = byId('basisSuggest0Msg'); if(m0) m0.textContent = '';
-  var mN = byId('basisSuggestNextMsg'); if(mN) mN.textContent = '';
+function clearBasisMsg(){
+  var m = byId('basisMsg'); if(m) m.textContent = '';
+}
+function setBasisMsg(t){
+  var m = byId('basisMsg'); if(m) m.textContent = t;
 }
 function startNewBasis(){ 
-  clearBasisSuggestMsg(); 
-  var _m=byId('basisResetMsg'); 
-  if(_m) _m.textContent=''; 
-  basis.locked=false;
+  clearBasisMsg(); 
+  basis.mappingComplete=false;
   var s0 = byId('basisSuggest0'); if (s0) s0.disabled = false;
   var sn = byId('basisSuggestNext');
   if (sn) {
@@ -910,14 +918,13 @@ function clearSuggested() {
     }
   } 
 }
-function highlightSuggested(idx,msgEl,msg) { 
-  clearSuggested(); 
-  var el = basis.pile ? basis.pile.querySelector('.card[data-index="'+idx+'"]') : null; 
+function highlightSuggested(idx,msg) { 
+  var el = (idx!=null && basis.pile) ? basis.pile.querySelector('.card[data-index="'+idx+'"]') : null; 
   if(el) { 
     el.classList.add('suggested'); 
-    if(msgEl) msgEl.textContent = msg || ('Suggested card: '+idx);
+    setBasisMsg(msg || ('Suggested card: '+idx));
   } else { 
-    if(msgEl) msgEl.textContent = 'No available card to suggest.'; 
+    setBasisMsg(msg || 'No available card to suggest.'); 
   }
 }
 function getPlacedValuesSet(){ var set={}; var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); for(var i=0;i<anchors.length;i++){ var v=readBasisValue(anchors[i]); if(v!=null) set[v]=1; } return set; }
@@ -938,14 +945,14 @@ function countQuadsForCard(v, Uarr, Uset){ var cnt=0; for(var i=0;i<Uarr.length;
 
 
 function suggestZero(){
-  var msgEl = byId('basisSuggest0Msg') || byId('basisMsg');
-  if (basis.locked) {
-    if (msgEl) msgEl.textContent = 'Click "Create new basis" first.';
+  if (!basis)  return;
+  if (basis.mappingComplete) {
+    setBasisMsg('Click "Create new basis" first.');
     return;
   }
   // If already filled, keep the existing message behavior
   if (readBasisValue(0) != null) {
-    if (msgEl) msgEl.textContent = 'Position 0 already placed.';
+    setBasisMsg('Position 0 already placed.');
     return;
   }
   // Universe of face-up cards
@@ -955,7 +962,7 @@ function suggestZero(){
   var exclude = getPlacedValuesSet();
   var candidates = pileCandidateArray(exclude);
   if (candidates.length === 0) {
-    highlightSuggested(null, msgEl, 'No available card to suggest.');
+    highlightSuggested(null, null);
     return;
   }
   // Count quads containing candidate v: for each c in U, let d=v^c^w, iterate w via U and count unique quads.
@@ -982,7 +989,7 @@ function suggestZero(){
     if (s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
   }
   var why = (best!=null) ? ('Suggested because it participates in ' + bestScore + ' face-up quads — the strongest starting card.') : null;
-  highlightSuggested(best, msgEl, why);
+  highlightSuggested(best, why);
 }
 
 
@@ -1090,23 +1097,21 @@ var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
 }
 
 function suggestNextBasis(){
-  var msgEl=byId('basisSuggestNextMsg');
-  if(basis.locked){ if(msgEl) msgEl.textContent='Click "Create new basis" first.'; return; }
+  if (!basis)  return;
+  if(basis.mappingComplete){ setBasisMsg('Click "Create new basis" first.'); return; }
   // Next unfilled basis among 1,2,4,8,16,32
   var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;});
   var next=null; for(var i=0;i<anchors.length;i++){ if(readBasisValue(anchors[i])==null){ next=anchors[i]; break; } }
-  if(next==null){ if(msgEl) msgEl.textContent='All basis positions are filled.'; return; }
+  if(next==null){ setBasisMsg('All basis positions are filled.'); return; }
 
   var exclude=getPlacedValuesSet();
   var candidates=pileCandidateArray(exclude);
-  if(candidates.length===0){ highlightSuggested(null,msgEl,'No available card to suggest.'); return; }
+  if(candidates.length===0){ highlightSuggested(null, null); return; }
 
   if (next === 1) {
-    var msgEl = byId('basisSuggestNextMsg') || byId('basisMsg');
     var v0 = readBasisValue(0);
     if (v0 == null) {
-      if (msgEl) msgEl.textContent = 'Place position 0 first (use "Suggest 0").';
-      highlightSuggested(null, msgEl, null);
+      highlightSuggested(null, 'Place position 0 first (use "Suggest 0").');
       return;
     }
     var Uarr = (typeof getFaceUpArraySorted==='function') ? getFaceUpArraySorted() : [];
@@ -1114,8 +1119,7 @@ function suggestNextBasis(){
     var exclude = getPlacedValuesSet();
     var candidates = pileCandidateArray(exclude);
     if (candidates.length === 0) {
-      if (msgEl) msgEl.textContent = 'No available card to suggest.';
-      highlightSuggested(null, msgEl, null);
+      highlightSuggested(null, null);
       return;
     }
     function countPairQuads(a, b) {
@@ -1137,8 +1141,7 @@ function suggestNextBasis(){
     var why = (best != null)
       ? ('Suggested because together with the card in position 0, it forms ' + bestScore + ' quads — the strongest pair available.')
       : null;
-    highlightSuggested(best, msgEl, why);
-    if (msgEl && why) msgEl.textContent = why;
+    highlightSuggested(best, why);
     return;
   }
   // Unified non-pos1 scoring: exact auto-fill preview drives both score and message
@@ -1152,10 +1155,8 @@ function suggestNextBasis(){
         bestScore = placed; best = cand; bestList = lst;
       }
     }
-    var _msg = (best != null) ? ('would place ' + bestScore + ' cards: [' + bestList.join(', ') + ']') : null;
-    highlightSuggested(best, msgEl, _msg);
-    if (!msgEl) msgEl = document.getElementById('basisSuggestNextMsg') || document.getElementById('basisMsg');
-    if (msgEl && _msg) msgEl.textContent = _msg;
+    var why = (best != null) ? ('would place ' + bestScore + ' cards: [' + bestList.join(', ') + ']') : null;
+    highlightSuggested(best, why);
     return;
   }
 
@@ -1167,15 +1168,16 @@ var best=null, bestScore=-1;
       bestScore=s; best=x;
     }
   }
-  highlightSuggested(best, msgEl, best!=null ? ('would place ' + bestScore + ' cards') : null);
+  var why = (best != null) ? ('would place ' + bestScore + ' cards') : null;
+  highlightSuggested(best, why);
 }
 
 var _basisMsgClearScheduled = false;
-function scheduleClearBasisMsgOnNextClick(){
+function scheduleclearBasisMsgOnNextClick(){
   if(_basisMsgClearScheduled) return;
   _basisMsgClearScheduled = true;
   var handler = function(){
-    clearBasisSuggestMsg();
+    clearBasisMsg();
     _basisMsgClearScheduled = false;
     document.removeEventListener('click', handler, true);
   };
@@ -1576,6 +1578,7 @@ function hintOneQuad(){
 }
 
 function resetFoundList(){
+  if (!find) return;
   find.found.length=0;
   find.foundSet={};
   renderFoundList();
