@@ -51,7 +51,7 @@
     .pic { display:flex; justify-content:center; width:100%; }
     /* try to use a consistent font across devices for symbols */
     .pic { font-family: "Times New Roman", "Segoe UI Symbol", "Noto Sans Symbols", "Arial Unicode MS", sans-serif; }
-    .pic { font-size:12px; line-height:12px; vertical-align:middle; }
+    .pic { font-size:14px; line-height:12px; vertical-align:middle; }
     .mini .pic { font-size:9px; }
     .pile .pic { font-size:9px; }
 
@@ -133,8 +133,7 @@
     <section id="panel-layout" class="tab-panel" role="tabpanel" aria-labelledby="tab-layout" aria-hidden="true">
       <div class="row"><span id="basisGroup" class="pill">
         <button id="basisStartNew" class="primary">Create new basis</button>
-        <button id="basisSuggest0">Suggest 0</button>
-        <button id="basisSuggestNext">Suggest next</button>
+        <button id="basisSuggestNext">Suggest Next</button>
         <div class="basis-msg">
           <span id="basisMsg" class="muted"></span>
         </div>
@@ -591,7 +590,7 @@ function enableBasisDnD(){
         src.setAttribute('data-auto','0'); 
       } 
       basisAutoFill(); 
-      clearBasisMsg();
+      setBasisMsg();
     }
   });
 }
@@ -775,7 +774,7 @@ function computeNeedsForMapping(vals){
 // Score: how many real pile cards would be placed if we assign `candidate` to basis position `nextPos`
 function placementScore(nextPos, candidate){
   var vals = currentBasisVals();
-  if(nextPos===0) return 0; // handled by suggestZero()
+  if(nextPos===0) return 0; // handled by basisSuggestZero()
   if(nextPos===1) vals.v1 = candidate;
   else if(nextPos===2) vals.v2 = candidate;
   else if(nextPos===4) vals.v4 = candidate;
@@ -813,11 +812,11 @@ function initBasisTab(){
   basis.pile.innerHTML='';
   updateBasisStats();
   var startBtn = byId('basisStartNew'); if(startBtn){ startBtn.onclick = function(){ startNewBasis(); }; }
-  var s0 = byId('basisSuggest0'); if(s0){ s0.onclick = suggestZero; }
-  var sn = byId('basisSuggestNext'); if(sn){ sn.onclick = suggestNextBasis; }
+  var sn = byId('basisSuggestNext'); if(sn){ 
+    sn.onclick = basisSuggestNext;
+    sn.disabled = false;
+  }
   var resetBtn = byId('basisResetLayout'); if(resetBtn){ resetBtn.onclick = resetToStandardLayout; }
-  if(byId('basisSuggest0')) byId('basisSuggest0').disabled = true;
-  if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = true;
 }
 function refreshBasisEverything(){ 
   if(!basis.mappingComplete){ 
@@ -828,7 +827,7 @@ function refreshBasisEverything(){
 }
 function applyMappingToSelect(useLocked){ if(useLocked===void 0) useLocked=false; var map=(useLocked && basis.lockedPos2val)? basis.lockedPos2val : basis.pos2val; if(!map) return; var half=(DECK===64?32:(DECK===32?16:DECK)); for(var p=0;p<DECK;p++){ var val=map[p]; var card=getCardEl(val); if(!card) continue; var targetGrid=(p<half)? gridL : gridR; targetGrid.appendChild(card.closest('.cell')); } }
 function checkAndLockPositions(){ 
-  clearBasisMsg();
+  setBasisMsg();
   snapshotLayoutMapping();
   if(!basis.mappingComplete){ return; }
   basis.lockedPos2val = basis.pos2val.slice(0);
@@ -836,8 +835,7 @@ function checkAndLockPositions(){
   buildPhiGridIfInit();
   showPreBasisGrid();
   if(basis.pile) basis.pile.innerHTML='';
-  if(byId('basisSuggest0')) byId('basisSuggest0').disabled = true;
-  if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = true;
+  sn = byId('basisSuggestNext'); if(sn) sn.disabled = true;
   updateBasisStats();
   updateDownstreamCounts();
   setBasisMsg('Basis locked: layout applied to all tabs.');
@@ -854,7 +852,7 @@ function resetToStandardLayout(){
   updateBasisStats();
   buildPhiGridIfInit();
   if(basis && basis.pile){ basis.pile.innerHTML=''; }
-  clearBasisMsg();
+  setBasisMsg();
 }
 function makeStaticCard(n){ 
   var cell=document.createElement('div'); cell.className='cell'; 
@@ -889,26 +887,20 @@ function showPreBasisGrid(){
   } 
   byId('basisGridTitle').textContent='Grid (current positions)';
 }
-function clearBasisMsg(){
-  var m = byId('basisMsg'); if(m) m.textContent = '';
-}
 function setBasisMsg(t){
-  var m = byId('basisMsg'); if(m) m.textContent = t;
+  var m = byId('basisMsg'); if(m) m.textContent = t || '';
 }
 function startNewBasis(){ 
-  clearBasisMsg(); 
+  setBasisMsg(); 
   basis.mappingComplete=false;
-  var s0 = byId('basisSuggest0'); if (s0) s0.disabled = false;
   var sn = byId('basisSuggestNext');
   if (sn) {
+    sn.onclick = basisSuggestNext;
     sn.disabled = false;
-    sn.onclick = suggestNextBasis;
   }
   buildBasisGrid(); 
   refreshBasisPile(); 
   basisAutoFill(); 
-  if(byId('basisSuggest0')) byId('basisSuggest0').disabled = false; 
-  if(byId('basisSuggestNext')) byId('basisSuggestNext').disabled = false;
 }
 
 // Suggestion helpers
@@ -945,8 +937,7 @@ function getFaceUpSet(){
 }
 function countQuadsForCard(v, Uarr, Uset){ var cnt=0; for(var i=0;i<Uarr.length;i++){ var b=Uarr[i]; if(b===v) continue; for(var j=i+1;j<Uarr.length;j++){ var c=Uarr[j]; if(c===v) continue; var d=(v^b^c); if(d in Uset && d>c && d!==v && d!==b && d!==c && d<DECK) cnt++; } } return cnt; }
 
-
-function suggestZero(){
+function basisSuggestZero(){
   if (!basis)  return;
   if (basis.mappingComplete) {
     setBasisMsg('Click "Create new basis" first.');
@@ -958,13 +949,13 @@ function suggestZero(){
     return;
   }
   // Universe of face-up cards
-  var Uarr = (typeof getFaceUpArraySorted==='function') ? getFaceUpArraySorted() : [];
+  var Uarr = getFaceUpArraySorted();
   var Uset = {}; for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
   // Candidates from pile
   var exclude = getPlacedValuesSet();
   var candidates = pileCandidateArray(exclude);
   if (candidates.length === 0) {
-    highlightSuggested(null, null);
+    highlightSuggested(null, null);  // None available
     return;
   }
   // Count quads containing candidate v: for each c in U, let d=v^c^w, iterate w via U and count unique quads.
@@ -1044,13 +1035,13 @@ function placementDetails(next, cand){
 function placementDetailsExactAutoFill(next, cand){
   try{
     var v0  = readBasisValue(0);
-var v1  = readBasisValue(1);
-var v2  = (next===2  ? cand : readBasisValue(2));
-var v4  = (next===4  ? cand : readBasisValue(4));
-var v8  = (next===8  ? cand : readBasisValue(8));
-var v16 = (next===16 ? cand : readBasisValue(16));
-var v32 = (next===32 ? cand : readBasisValue(32));
-function allRequiredAnchorsKnown(k){
+    var v1  = readBasisValue(1);
+    var v2  = (next===2  ? cand : readBasisValue(2));
+    var v4  = (next===4  ? cand : readBasisValue(4));
+    var v8  = (next===8  ? cand : readBasisValue(8));
+    var v16 = (next===16 ? cand : readBasisValue(16));
+    var v32 = (next===32 ? cand : readBasisValue(32));
+    function allRequiredAnchorsKnown(k){
       if ((k & 1)  && v1  == null) return false;
       if ((k & 2)  && v2  == null) return false;
       if ((k & 4)  && v4  == null) return false;
@@ -1059,7 +1050,7 @@ function allRequiredAnchorsKnown(k){
       if ((k & 32) && v32 == null) return false;
       return true;
     }
-var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
+    var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
 
     var exclude = getPlacedValuesSet();
     var pile    = pileCandidateArray(exclude);
@@ -1098,9 +1089,10 @@ var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
   }catch(_){ return []; }
 }
 
-function suggestNextBasis(){
+function basisSuggestNext(){
   if (!basis)  return;
   if(basis.mappingComplete){ setBasisMsg('Click "Create new basis" first.'); return; }
+
   // Next unfilled basis among 1,2,4,8,16,32
   var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;});
   var next=null; for(var i=0;i<anchors.length;i++){ if(readBasisValue(anchors[i])==null){ next=anchors[i]; break; } }
@@ -1108,22 +1100,18 @@ function suggestNextBasis(){
 
   var exclude=getPlacedValuesSet();
   var candidates=pileCandidateArray(exclude);
-  if(candidates.length===0){ highlightSuggested(null, null); return; }
+  if(candidates.length===0){ highlightSuggested(null, null); return; }  // No available
+
+  // Separate logic for picking the best starting (0) card
+  var v0 = readBasisValue(0);
+  if (v0 == null) {
+    basisSuggestZero();
+    return;
+  }
 
   if (next === 1) {
-    var v0 = readBasisValue(0);
-    if (v0 == null) {
-      highlightSuggested(null, 'Place position 0 first (use "Suggest 0").');
-      return;
-    }
-    var Uarr = (typeof getFaceUpArraySorted==='function') ? getFaceUpArraySorted() : [];
+    var Uarr = getFaceUpArraySorted();
     var Uset = {}; for (var i2=0;i2<Uarr.length;i2++) Uset[Uarr[i2]] = 1;
-    var exclude = getPlacedValuesSet();
-    var candidates = pileCandidateArray(exclude);
-    if (candidates.length === 0) {
-      highlightSuggested(null, null);
-      return;
-    }
     function countPairQuads(a, b) {
       var cnt = 0;
       for (var i3 = 0; i3 < Uarr.length; i3++) {
@@ -1151,7 +1139,7 @@ function suggestNextBasis(){
     var best = null, bestList = [], bestScore = -1;
     for (var j = 0; j < candidates.length; j++){
       var cand = candidates[j];
-      var lst  = (typeof placementDetailsExactAutoFill === 'function') ? placementDetailsExactAutoFill(next, cand) : [];
+      var lst  = placementDetailsExactAutoFill(next, cand);
       var placed = lst.length;
       if (placed > bestScore || (placed === bestScore && cand < best)){
         bestScore = placed; best = cand; bestList = lst;
@@ -1179,7 +1167,7 @@ function scheduleclearBasisMsgOnNextClick(){
   if(_basisMsgClearScheduled) return;
   _basisMsgClearScheduled = true;
   var handler = function(){
-    clearBasisMsg();
+    setBasisMsg();
     _basisMsgClearScheduled = false;
     document.removeEventListener('click', handler, true);
   };
