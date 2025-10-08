@@ -468,6 +468,7 @@ if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded
 var basis={ pile:null, gridL:null, gridR:null, suggestedIndex:null, pos2val:null, val2pos:null, mappingComplete:false, lockedPos2val:null };
 
 function ensureInitBasisTab(){
+  setBasisMsg();
   if(!basis.pile){
     initBasisTab();
   }
@@ -805,9 +806,11 @@ function updateBasisStats(){
   var basisQ  = byId('basisQuadCount'); if(basisQ) basisQ.textContent = String(computeQuadsBasic(up));
 }
 function initBasisTab(){
+  if (!basis)  return;
   basis.pile=byId('basisPile');
   basis.gridL=byId('basis-grid-left');
   basis.gridR=byId('basis-grid-right');
+  setBasisMsg(); 
   showPreBasisGrid();
   basis.pile.innerHTML='';
   updateBasisStats();
