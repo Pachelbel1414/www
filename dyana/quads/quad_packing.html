@@ -233,7 +233,9 @@ var statusEl, deckSel, upCountEl, gridL, gridR;
 function allCards(){ 
   return Array.prototype.slice.call(document.querySelectorAll('#grid-left .card, #grid-right .card'));
 }
-function getCardEl(n){ return document.querySelector('#grid-left .card[data-index="'+n+'"], #grid-right .card[data-index="'+n+'"]'); }
+function getCardEl(n){ 
+  return ((n != null) && (n>=0)) ? document.querySelector('#grid-left .card[data-index="'+n+'"], #grid-right .card[data-index="'+n+'"]') : null;
+}
 function isFaceUp(n){ 
   var el=getCardEl(n);
   if(!el) return;
@@ -494,6 +496,7 @@ function addBasisDataDnd(e, n, d) {
     e.dataTransfer.setData('from','pile');
   }
 }
+
 function makeBasisCard(n){ 
   var d=document.createElement('div'); 
   d.className='card faceup'; 
@@ -508,6 +511,7 @@ function makeBasisCard(n){
   });
   return d;
 }
+
 function basisCellAt(pos){
   if(pos<0||pos>DECK) return null;
   if(!basis||!basis.gridL||!basis.gridR) return;
@@ -515,16 +519,20 @@ function basisCellAt(pos){
   if(pos<rightStart) return basis.gridL.children[pos]||null; 
   return basis.gridR.children[pos-rightStart]||null;
 }
+
 function buildBasisGrid(){ 
   if(!basis||!basis.gridL||!basis.gridR) return; 
   basis.gridL.innerHTML=''; 
-  basis.gridR.innerHTML=''; 
-  ends = { 32:[16,32], 16:[16,0] }[DECK] || [32,64];  // default to DECK=64
-  for(var a=0; a<ends[0]; a++) basis.gridL.appendChild(makeBasisCell(a)); 
-  for(var b=ends[0]; b<ends[1]; b++) basis.gridR.appendChild(makeBasisCell(b)); 
+  basis.gridR.innerHTML='';
+  var half=(DECK===64?32:(DECK===32?16:DECK)); 
+  for(var p=0;p<DECK;p++){ 
+    var targetGrid = (p<half) ? basis.gridL : basis.gridR;
+    targetGrid.appendChild(makeBasisCell(p));
+  }
   byId('basisGridTitle').textContent='Grid ('+DECK+' places)'; 
   enableBasisDnD();
 }
+
 function refreshBasisPile(){ 
   if(!basis||!basis.pile) return; 
   var sel=getSelectedIndicesUniqueSorted(); 
@@ -532,6 +540,7 @@ function refreshBasisPile(){
   for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i]));
   updateBasisStats();
 }
+
 function moveBasisCard(pos, cell, idx, from, fromPos) {
   clearSuggested();
   cell.classList.remove('drop-ok'); 
@@ -566,6 +575,7 @@ function moveBasisCard(pos, cell, idx, from, fromPos) {
   scheduleclearBasisMsgOnNextClick(); 
   checkAndLockPositions();
 }
+
 function enableBasisDnD(){ 
   var droppables=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); 
   droppables.forEach(function(pos){ 
@@ -740,6 +750,7 @@ function initBasisTab(){
   }
   var resetBtn = byId('basisResetLayout'); if(resetBtn){ resetBtn.onclick = resetToStandardLayout; }
 }
+
 function refreshBasisEverything(){ 
   if(!basis.mappingComplete){ 
     buildBasisGrid(); refreshBasisPile(); basisAutoFill();
@@ -747,6 +758,8 @@ function refreshBasisEverything(){
     showPreBasisGrid(); updateBasisStats();
   }
 }
+
+// this updates the deck grids
 function applyMappingToSelect(){ 
   if(!basis || !basis.lockedPos2val) return; 
   var half=(DECK===64?32:(DECK===32?16:DECK)); 
@@ -758,11 +771,12 @@ function applyMappingToSelect(){
     targetGrid.appendChild(card.closest('.cell'));
   }
 }
+
 function checkAndLockPositions(){ 
   setBasisMsg();
   snapshotLayoutMapping();
   if(!basis || !basis.mappingComplete){ return; }
-  basis.lockedPos2val = basis.pos2val.slice(0);
+  basis.lockedPos2val = basis.pos2val.slice();  // copy
   applyMappingToSelect();
   buildPhiGridIfInit();
   showPreBasisGrid();
@@ -772,13 +786,14 @@ function checkAndLockPositions(){
   updateDownstreamCounts();
   setBasisMsg('Basis locked: layout applied to all tabs.');
 }
+
 function resetToStandardLayout(){
   if(!basis) return;
   var map=[]; 
   for(var i=0;i<DECK;i++) map[i]=i;  // create standard layout
-  basis.pos2val = map.slice();
-  basis.val2pos = map.slice();
-  basis.lockedPos2val = map.slice();
+  basis.pos2val = map.slice();  // copy
+  basis.val2pos = map.slice();  // copy
+  basis.lockedPos2val = map.slice();  // copy
   basis.mappingComplete = true;
   applyMappingToSelect();
   showPreBasisGrid();
@@ -787,6 +802,7 @@ function resetToStandardLayout(){
   if(basis.pile) basis.pile.innerHTML='';
   setBasisMsg();
 }
+
 function makeStaticCard(n){ 
   var cell=document.createElement('div'); cell.className='cell'; 
   var card=document.createElement('div'); card.className='card'; 
@@ -797,34 +813,34 @@ function makeStaticCard(n){
   cell.appendChild(card); 
   return cell;
 }
+
 function currentPositionMap(){
   if (basis && basis.mappingComplete) { 
-    if(basis.lockedPos2val) return basis.lockedPos2val.slice(0); 
-    if(basis.pos2val) return basis.pos2val.slice(0); 
+    if(basis.lockedPos2val) return basis.lockedPos2val.slice(); // copy
+    if(basis.pos2val) return basis.pos2val.slice(); // copy
   }
   var m=[]; 
   for(var i=0;i<DECK;i++) m[i]=i; // create standard layout
   return m;
 }
+
 function showPreBasisGrid(){ 
   if(!basis || !basis.gridL || !basis.gridR) return; 
   var map=currentPositionMap(); 
   basis.gridL.innerHTML=''; 
   basis.gridR.innerHTML=''; 
-  if(DECK===64){ 
-    for(var i=0;i<32;i++) basis.gridL.appendChild(makeStaticCard(map[i])); 
-    for(var j=32;j<64;j++) basis.gridR.appendChild(makeStaticCard(map[j])); 
-  } else if(DECK===32){ 
-    for(var a=0;a<16;a++) basis.gridL.appendChild(makeStaticCard(map[a])); 
-    for(var b=16;b<32;b++) basis.gridR.appendChild(makeStaticCard(map[b])); 
-  } else { 
-    for(var c=0;c<16;c++) basis.gridL.appendChild(makeStaticCard(map[c])); 
-  } 
+  var half=(DECK===64?32:(DECK===32?16:DECK)); 
+  for(var p=0;p<DECK;p++){ 
+    var targetGrid = (p<half) ? basis.gridL : basis.gridR; 
+    targetGrid.appendChild(makeStaticCard(map[p]));
+  }
   byId('basisGridTitle').textContent='Grid (current positions)';
 }
+
 function setBasisMsg(t){
   var m = byId('basisMsg'); if(m) m.textContent = t || '';
 }
+
 function startNewBasis(){ 
   setBasisMsg(); 
   basis.mappingComplete=false;
@@ -847,6 +863,7 @@ function clearSuggested() {
     }
   } 
 }
+
 function highlightSuggested(idx,msg) { 
   var el = (idx!=null && basis.pile) ? basis.pile.querySelector('.card[data-index="'+idx+'"]') : null; 
   if(el) {
@@ -857,6 +874,7 @@ function highlightSuggested(idx,msg) {
     setBasisMsg(msg || 'No available card to suggest.'); 
   }
 }
+
 function getPlacedValuesSet(){ var set={}; var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); for(var i=0;i<anchors.length;i++){ var v=readBasisValue(anchors[i]); if(v!=null) set[v]=1; } return set; }
 function pileCandidateArray(excludeSet){ if(!basis.pile) return []; var els=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]')); var out=[]; for(var i=0;i<els.length;i++){ var v=+els[i].dataset.index; if(!excludeSet || !excludeSet[v]) out.push(v); } return out; }
 function getFaceUpArraySorted(){ 
@@ -912,7 +930,6 @@ function basisSuggestZero(){
   var why = (best!=null) ? ('Suggested because it participates in ' + bestScore + ' face-up quads — the strongest starting card.') : null;
   highlightSuggested(best, why);
 }
-
 
 // EXACT auto-fill preview: which indices would actually place now for (next, cand)
 function placementDetailsExactAutoFill(next, cand){
@@ -1056,7 +1073,6 @@ function buildPhiGrid(){
     phi.quadsBefore = String(computeQuadsBasic(getSelectedIndices()));
   }
   var map=currentPositionMap(); 
-  var leftCount=(DECK===64?32:(DECK===32?16:DECK)); 
   phi.part = phi.part || (function(){ var sel=byId('phiPartition'); 
     var mode; 
     if(DECK===16){ 
@@ -1066,12 +1082,20 @@ function buildPhiGrid(){
       mode = sel ? sel.value : 'lr';
     } 
     return buildPartition(mode);
-  })(); 
+  })();
+  var half=(DECK===64?32:(DECK===32?16:DECK)); 
   for(var p=0;p<DECK;p++){ 
     var v=map[p]; 
     var cell=makePhiCard(v); 
     cell.dataset.pos=String(p); 
-    if(phi.part && phi.part[p]==='A'){ cell.classList.add('phiA'); } else if(phi.part && phi.part[p]==='B'){ cell.classList.add('phiB'); } var target=(p<leftCount)?phi.gridL:phi.gridR; target.appendChild(cell); }
+    if(phi.part && phi.part[p]==='A'){ 
+      cell.classList.add('phiA');
+    } else if(phi.part && phi.part[p]==='B'){
+      cell.classList.add('phiB');
+    }
+    var targetGrid = (p<half) ? phi.gridL : phi.gridR; 
+    targetGrid.appendChild(cell);
+  }
   updatePhiQuadsDisplay(); 
   enhancePhiGrid(); 
   reapplySelectedAB(); 
@@ -1081,7 +1105,22 @@ function initPhiTab(){ phi.gridL = byId('phi-grid-left'); phi.gridR = byId('phi-
 function reapplySelectedAB(){ if(phi.selA==null && phi.selB==null) return; function mark(index, cls){ if(index==null) return; var el=document.querySelector('#phi-grid-left .card[data-index="'+index+'"], #phi-grid-right .card[data-index="'+index+'"]'); if(el){ var cell=el.closest('.cell'); if(cell) cell.classList.add(cls); } } mark(phi.selB,'phiSelectedB'); mark(phi.selA,'phiSelectedA'); }
 function updatePartitionDisables(){ var sel=byId('phiPartition'); if(!sel) return; for(var i=0;i<sel.options.length;i++) sel.options[i].disabled=false; if(DECK===32){ var optTB=sel.querySelector('option[value="tb"]'); if(optTB) optTB.disabled=true; if(sel.value==='tb') sel.value='lr'; } if(DECK===16){ var optTB2=sel.querySelector('option[value="tb"]'); var optLR=sel.querySelector('option[value="lr"]'); if(optTB2) optTB2.disabled=true; if(optLR) optLR.disabled=true; if(sel.value==='tb'||sel.value==='lr') sel.value='rowsdbl'; } }
 function posRC(p){ var cols=4; var half=(DECK===64?32:(DECK===32?16:DECK)); var rowsPerSide=(DECK===64?8:4); var local=(DECK===16? p : (p<half? p : p-half)); var row=Math.floor(local/cols); var col=local%cols; return {row:row,col:col,rowsPerSide:rowsPerSide,side:(DECK===16?'L':(p<half?'L':'R'))}; }
-function buildPartition(mode){ var part=Array(DECK).fill(null); for(var p=0;p<DECK;p++){ var rc=posRC(p); var inA=false; if(mode==='lr'){ inA=(rc.side==='L'); } else if(mode==='tb'){ inA=(rc.row < rc.rowsPerSide/2); } else if(mode==='rowsdbl'){ inA=(Math.floor(rc.row/2)%2===0); } else if(mode==='colsdbl'){ inA=(Math.floor(rc.col/2)%2===0); } else if(mode==='rowsAlt'){ inA=(rc.row%2===0); } else if(mode==='colsAlt'){ inA=(rc.col%2===0); } part[p]=inA?'A':'B'; } return part; }
+function buildPartition(mode){ 
+  var part=Array(DECK).fill('B');  // A or B, default B 
+  for(var p=0;p<DECK;p++){ 
+    var rc=posRC(p);
+    var inA=false; 
+    if(mode==='lr'){ inA=(rc.side==='L');
+    } else if(mode==='tb'){ inA=(rc.row < rc.rowsPerSide/2);
+    } else if(mode==='rowsdbl'){ inA=(Math.floor(rc.row/2)%2===0);
+    } else if(mode==='colsdbl'){ inA=(Math.floor(rc.col/2)%2===0);
+    } else if(mode==='rowsAlt'){ inA=(rc.row%2===0);
+    } else if(mode==='colsAlt'){ inA=(rc.col%2===0);
+    }
+    if(inA) part[p]='A';
+  }
+  return part;
+}
 function enhancePhiGrid(){ 
   var map=currentPositionMap(); 
   var leftCount=(DECK===64?32:(DECK===32?16:DECK)); 
@@ -1236,25 +1275,33 @@ function toggleFindSelection(cardEl, value){
   }
   updateFindCounts();
 }
+
 function clearFindSelection(){
   find.selected.length=0;
   syncFindSelectedClass();
   updateFindCounts();
   setFindMsg('Selection cleared.');
 }
+
+function getFindGridCardEl(n){ 
+  return ((n != null) && (n>=0)) ? document.querySelector('#find-grid-left .card[data-index="'+n+'"], #find-grid-right .card[data-index="'+n+'"]') : null;
+}
+
 function syncFindSelectedClass(){
   var cards=document.querySelectorAll('#find-grid-left .card, #find-grid-right .card');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('selected');
   for(var j=0;j<find.selected.length;j++){
     var v=find.selected[j];
-    var el=document.querySelector('#find-grid-left .card[data-index="'+v+'"], #find-grid-right .card[data-index="'+v+'"]');
+    var el=getFindGridCardEl(v);
     if(el) el.classList.add('selected');
   }
 }
+
 function keyForQuad(arr){
   var s=arr.slice().sort(function(a,b){return a-b;});
   return s.join(',');
 }
+
 function isQuad(arr){
   if(arr.length!==4) return false;
   var mask=(DECK===64?63:(DECK===32?31:15));
@@ -1334,17 +1381,16 @@ function hintOneQuad(){
     // XOR=0 (uses your deck mask implicitly via indices in Uset)
     return ((a ^ b ^ c ^ d) === 0);
   }
+
   function notAlreadyFound(q){
     var key = keyForQuad(q);          // canonical 4-set key
     return !(find && find.foundSet && find.foundSet[key]);
   }
+
   function hintCards(Q){
     for (var k=0;k<4;k++){
       var v = Q[k];
-      var el = document.querySelector(
-        '#find-grid-left .card[data-index="'+v+'"], ' +
-        '#find-grid-right .card[data-index="'+v+'"]'
-      );
+      var el = getFindGridCardEl(v);
       if (el) el.classList.add('hint');
     }
     setTimeout(clearFindHints, 2500);
@@ -1440,6 +1486,7 @@ function resetFoundList(){
   updateFindCounts();
   setFindMsg('Found list reset.');
 }
+
 function updateFindCounts(){
   var totalEl = byId('findTotalQuads');
   var foundEl = byId('findFoundCount');
