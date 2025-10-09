@@ -1288,7 +1288,8 @@ function getFindGridCardEl(n){
 }
 
 function syncFindSelectedClass(){
-  var cards=document.querySelectorAll('#find-grid-left .card, #find-grid-right .card');
+  // get the set of cards that are selected
+  var cards=document.querySelectorAll('#find-grid-left .card.selected, #find-grid-right .card.selected');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('selected');
   for(var j=0;j<find.selected.length;j++){
     var v=find.selected[j];
@@ -1308,6 +1309,7 @@ function isQuad(arr){
   var a=arr[0]&mask, b=arr[1]&mask, c=arr[2]&mask, d=arr[3]&mask;
   return ((a^b^c^d)===0);
 }
+
 function checkAndStoreQuad(sel4){
   for(var i=0;i<sel4.length;i++){ if(!isFaceUp(sel4[i])){ setFindMsg('All four must be face-up.'); return finishSelection(false); } }
   if(!isQuad(sel4)){
@@ -1333,28 +1335,32 @@ function checkAndStoreQuad(sel4){
   setFindMsg('✔ Quad recorded!');
   return finishSelection(true);
 }
+
 function finishSelection(clearIt){
   if(clearIt){ find.selected.length=0; }
   syncFindSelectedClass();
 }
+
 function renderFoundList(){
   var wrap=byId('foundQuadsWrap');
   if(!wrap) return;
   wrap.innerHTML='';
   for(var i=0;i<find.found.length;i++){
     var q=find.found[i];
-    var row=document.createElement('div'); 
-    row.className='found-quad';
+    var fq=document.createElement('div'); 
+    fq.className='found-quad';
     for(var j=0;j<q.length;j++){
-      row.appendChild(makeMiniCard(q[j]));
+      fq.appendChild(makeMiniCard(q[j]));
     }
-    wrap.appendChild(row);
+    wrap.appendChild(fq);
   }
 }
+
 function clearFindHints(){
   var cards = document.querySelectorAll('#find-grid-left .card.hint, #find-grid-right .card.hint');
   for(var i=0;i<cards.length;i++){ cards[i].classList.remove('hint'); }
 }
+
 function hintOneQuad(){
   // Clear any previous yellow hint rings
   clearFindHints();
@@ -1376,7 +1382,7 @@ function hintOneQuad(){
 
   // Helpers
   function validQuad(a,b,c,d){
-    if (a===b || a===c || a===d || b===c || b===d || c===d) return false;
+    if (a===b || a===c || a===d || b===c || b===d || c===d) return false;  // no duplicate cards allowed
     if (!(a in Uset) || !(b in Uset) || !(c in Uset) || !(d in Uset)) return false;
     // XOR=0 (uses your deck mask implicitly via indices in Uset)
     return ((a ^ b ^ c ^ d) === 0);
@@ -1490,7 +1496,7 @@ function resetFoundList(){
 function updateFindCounts(){
   var totalEl = byId('findTotalQuads');
   var foundEl = byId('findFoundCount');
-  if(!totalEl&&!foundEl)  return;
+  if(!totalEl&&!foundEl) return;
   var total = computeQuadsBasic(getSelectedIndices());
   if(totalEl) totalEl.textContent = String(total);
   if(foundEl){ 
