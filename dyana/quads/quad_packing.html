@@ -476,15 +476,17 @@ function ensureInitBasisTab(){
   }
 }
 function refreshIfOnLayout(){ if(tabs[1] && tabs[1].panel.getAttribute('aria-hidden')==='false'){ refreshBasisEverything(); } }
+
 function makeBasisCell(i){ 
   var basisPos=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); 
   var d=document.createElement('div'); 
   d.className='cell badge'; 
   d.setAttribute('data-pos', i); 
   d.setAttribute('data-auto','0'); 
-  if(basisPos.indexOf(i)!==-1) d.classList.add('basis'); 
+  if(basisPos.indexOf(i)!==-1) d.classList.add('basis');  // one of 7 basis positions
   return d;
 }
+
 function addBasisDataDnd(e, n, d) {
   e.dataTransfer.effectAllowed='move';
   e.dataTransfer.setData('data-index', String(n)); 
@@ -513,8 +515,8 @@ function makeBasisCard(n){
 }
 
 function basisCellAt(pos){
-  if(pos<0||pos>DECK) return null;
-  if(!basis||!basis.gridL||!basis.gridR) return;
+  if(pos==null||pos<0||pos>=DECK) return null;
+  if(!basis||!basis.gridL||!basis.gridR) return null;
   var rightStart=(DECK===64?32:(DECK===32?16:Infinity)); 
   if(pos<rightStart) return basis.gridL.children[pos]||null; 
   return basis.gridR.children[pos-rightStart]||null;
@@ -541,96 +543,95 @@ function refreshBasisPile(){
   updateBasisStats();
 }
 
-function moveBasisCard(pos, cell, idx, from, fromPos) {
-  clearSuggested();
-  cell.classList.remove('drop-ok'); 
-  var node=null; 
-  if(from==='pile'){ 
-    node=basis.pile.querySelector('.card[data-index="'+idx+'"]'); 
-  } else if(from==='grid') {
-    var src=basisCellAt(fromPos); 
-    if(src){
-      node=src.querySelector('.card[data-index="'+idx+'"]')
-      src.innerHTML=''; 
-      src.classList.add('badge'); 
-      src.setAttribute('data-pos', String(fromPos)); 
-      src.setAttribute('data-auto','0'); 
-    } 
-  }
-  if(!node) return; 
-  var prev=cell.querySelector('.card');
-  if(prev && basis && basis.pile){ 
-    prev.classList.remove('basis-placed'); 
-    basis.pile.appendChild(prev);
-  }
+function resetBasisCell(pos){ 
+  var cell=basisCellAt(pos); 
+  if(!cell) return;
+  // should only be one card, if any, and every card should have data-index
+  var card=cell.querySelector('[data-index]');
+  if(card && basis && basis.pile){
+    // if card in cell, move it to pile
+    card.classList.remove('basis-placed');
+    basis.pile.appendChild(card);  // will not add a dupe
+  } 
   cell.innerHTML=''; 
   cell.classList.add('badge'); 
   cell.setAttribute('data-pos', String(pos)); 
-  cell.setAttribute('data-auto','0'); 
-  if(node){ 
-    node.classList.add('basis-placed');
+  cell.setAttribute('data-auto','0');
+}
+
+function moveBasisCard(to, toPos, idx, from, fromPos) {
+  // this handles pile->grid, grid->grid, and grid->pile moves
+  // toPos and fromPos will be null for 'pile' types
+  clearSuggested();
+
+  // no destCell when moving to pile
+  var destCell=basisCellAt(toPos);  
+  if (destCell) destCell.classList.remove('drop-ok'); 
+ 
+  // no srcCell when moving from pile
+  var srcCell=basisCellAt(fromPos);
+  if (srcCell) resetBasisCell(fromPos);  // temp put the card back on the pile
+
+  // get card to be moved
+  var card=basis.pile.querySelector('.card[data-index="'+idx+'"]'); 
+  if(!card) return;
+
+  // if dest is pile and it should already be there (nothing to do)
+  if (destCell) {
+    resetBasisCell(toPos);  // this will move any card in dest to pile
+    card.classList.add('basis-placed');  // add ring around card in basis pos
+    destCell.appendChild(card);  // this will handle removeChild if in pile
   }
-  cell.appendChild(node); 
+
+  // check if this triggers any auto changes
   basisAutoFill(); 
-  scheduleclearBasisMsgOnNextClick(); 
+  scheduleclearBasisMsgOnNextClick();
+  // if this fills in last basis pos or uses last card from pile, lock it down
   checkAndLockPositions();
 }
 
 function enableBasisDnD(){ 
   var droppables=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); 
-  droppables.forEach(function(pos){ 
-    var cell=basisCellAt(pos); 
-    if(!cell) return; 
-    cell.addEventListener('dragover', function(e){ e.preventDefault(); cell.classList.add('drop-ok'); }); 
-    cell.addEventListener('dragleave', function(){ cell.classList.remove('drop-ok'); }); 
-    cell.addEventListener('drop', function(e){ 
+  droppables.forEach(function(toPos){ 
+    var destCell=basisCellAt(toPos); 
+    if(!destCell) return; 
+    destCell.addEventListener('dragover', function(e){ e.preventDefault(); destCell.classList.add('drop-ok'); }); 
+    destCell.addEventListener('dragleave', function(){ destCell.classList.remove('drop-ok'); }); 
+    destCell.addEventListener('drop', function(e){ 
+      // drag from pile->grid or grid->grid
       e.preventDefault(); 
       var idx=parseInt(e.dataTransfer.getData('data-index'),10); 
-      var from=e.dataTransfer.getData('from'); 
+      var from=e.dataTransfer.getData('from');  // drag from grid or pile
       var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); 
-      moveBasisCard(pos, cell, idx, from, fromPos)
+      moveBasisCard('grid', toPos, idx, from, fromPos)
     }); 
-    cell.addEventListener('click', function(e){ 
-      e.preventDefault();
-      var cards = basis.pile.querySelectorAll('.card.suggested');  // get selected cards
-      if (cards && cards.length>0) {
-        var card=cards[0]
+    destCell.addEventListener('click', function(e){
+      // click from pile->grid 
+      var card = basis.pile.querySelector('.card.suggested');
+      if (card) {
         var idx=card.dataset.index;
-        var from='pile'; 
-        var fromPos=null;  // grid pos not needed
-        moveBasisCard(pos, cell, idx, from, fromPos)
+        moveBasisCard('grid', toPos, idx, 'pile', null)
       }
     }); 
   }); 
   basis.pile.addEventListener('dragover', function(e){ e.preventDefault(); }); 
-  basis.pile.addEventListener('drop', function(e){ 
-    e.preventDefault(); 
-    var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); 
-    if(!isNaN(fromPos)){ 
-      var src=basisCellAt(fromPos); 
-      if(src){
-        var c=src.querySelector('.card'); 
-        if(c){ 
-          c.classList.remove('basis-placed'); 
-          basis.pile.appendChild(c);  // add it to pile
-        } 
-        clearSuggested(); 
-        src.innerHTML=''; 
-        src.classList.add('badge'); 
-        src.setAttribute('data-pos', String(fromPos)); 
-        src.setAttribute('data-auto','0'); 
-      } 
-      basisAutoFill(); 
-      setBasisMsg();
-    }
+  basis.pile.addEventListener('drop', function(e){
+    // drag from grid->pile 
+    e.preventDefault();
+    var idx=parseInt(e.dataTransfer.getData('data-index'),10); 
+    var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10);
+    moveBasisCard('pile', null, idx, 'grid', fromPos)
   });
 }
+
 function readBasisValue(pos){ 
-  var c=basisCellAt(pos); 
-  if(!c) return null; 
-  var el=c.querySelector('[data-index]'); 
-  return el?+el.dataset.index:null;
+  var cell=basisCellAt(pos); 
+  if(!cell) return null;
+  // should only be one card, if any, and every card should have data-index
+  var card=cell.querySelector('[data-index]'); 
+  return card?+card.dataset.index:null;
 }
+
 function snapshotLayoutMapping(){ 
   if(basis){
     /* check if all suggestions placed */
@@ -686,7 +687,7 @@ function placeBasisAuto(targetPos, value){
       if(fromCell){
         fromCell.innerHTML='';
         fromCell.classList.add('badge');
-        fromCell.setAttribute('data-auto','1');
+        fromCell.setAttribute('data-auto','1');  // auto basis placed
       }
       node = elsewhere;
     }
@@ -694,10 +695,10 @@ function placeBasisAuto(targetPos, value){
   cell.innerHTML='';
   cell.classList.add('badge');
   cell.setAttribute('data-pos', String(targetPos));
-  cell.setAttribute('data-auto','1');
+  cell.setAttribute('data-auto','1');  // auto basis placed
   if(node){ cell.appendChild(node); }
 }
-function resetBasisCell(pos){ var cell=basisCellAt(pos); if(!cell) return; var prev=cell.querySelector('.card'); if(prev && basis && basis.pile){ basis.pile.appendChild(prev); } if(cell.getAttribute('data-auto')!=='1') return; var c=cell.querySelector('.card'); if(c){ basis.pile.appendChild(c); } cell.innerHTML=''; cell.classList.add('badge'); cell.setAttribute('data-pos', String(pos)); cell.setAttribute('data-auto','0'); }
+
 function xorFromLower(mask){ var bases=[1,2,4,8,16,32].filter(function(b){return b<DECK;}); var acc=0, have=true; for(var i=0;i<bases.length;i++){ var b=bases[i]; if(mask & b){ var v=readBasisValue(b); if(v==null){ have=false; break; } acc ^= v; } } return have?acc:null; }
 function popcount(x){ var c=0; while(x){ c+=x&1; x>>=1; } return c; }
 function basisAutoFill(){ 
@@ -1045,6 +1046,7 @@ function basisSuggestNext(){
   }
 }
 
+// this sets up so that the previous bassis msg is cleared on any document click
 var _basisMsgClearScheduled = false;
 function scheduleclearBasisMsgOnNextClick(){
   if(_basisMsgClearScheduled) return;
