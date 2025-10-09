@@ -705,14 +705,6 @@ function basisAutoFill(){
   clearSuggested();
 }
 
-// ---- Suggestion scoring by "most cards placed" ----
-function pileSetNow(){
-  var s={};
-  if(!basis.pile) return s;
-  var els = basis.pile.querySelectorAll('.card[data-index]');
-  for(var i=0;i<els.length;i++){ s[+els[i].dataset.index]=1; }
-  return s;
-}
 // Returns object with current basis values (may be null)
 function currentBasisVals(){
   return {
@@ -724,100 +716,6 @@ function currentBasisVals(){
     v16: readBasisValue(16),
     v32: readBasisValue(32)
   };
-}
-// Using a hypothetical set of basis values (some may be null), compute
-// an array of {pos, need} for positions that would be auto-determined.
-function computeNeedsForMapping(vals){
-  var out=[];
-  function pushNeed(pos, need){ if(pos<DECK){ out.push({pos:pos, need:need}); } }
-  var v0=vals.v0, v1=vals.v1, v2=vals.v2, v4=vals.v4, v8=vals.v8, v16=vals.v16, v32=vals.v32;
-  // 3,5,6,7
-  if(v0!=null && v1!=null && v2!=null) pushNeed(3, v0^v1^v2);
-  if(v0!=null && v1!=null && v4!=null) pushNeed(5, v0^v1^v4);
-  if(v0!=null && v2!=null && v4!=null) pushNeed(6, v0^v2^v4);
-  if(v1!=null && v2!=null && v4!=null) pushNeed(7, v1^v2^v4);
-  // 8+
-  if(DECK>8 && v8!=null){
-    for(var k=1;k<=7 && 8+k<DECK;k++){
-      var vr = 0, have=true;
-      var bases=[1,2,4];
-      for(var i=0;i<bases.length;i++){
-        var b=bases[i];
-        if(k & b){
-          var vv = (b===1? v1 : b===2? v2 : v4);
-          if(vv==null){ have=false; break; }
-          vr ^= vv;
-        }
-      }
-      if(!have) continue;
-      var need = (popcount(k)%2===1 && v0!=null)? (v0 ^ vr ^ v8) : (vr ^ v8);
-      pushNeed(8+k, need);
-    }
-  }
-  // 16+
-  if(DECK>16 && v16!=null){
-    for(var k2=1;k2<=15 && 16+k2<DECK;k2++){
-      var bases2=[1,2,4,8];
-      var vr2=0, have2=true;
-      for(var i2=0;i<bases2.length;i++){
-        var b2=bases2[i2];
-        if(k2 & b2){
-          var vv2 = (b2===1? v1 : b2===2? v2 : b2===4? v4 : v8);
-          if(vv2==null){ have2=false; break; }
-          vr2 ^= vv2;
-        }
-      }
-      if(!have2) continue;
-      var need2 = (popcount(k2)%2===1 && v0!=null)? (v0 ^ vr2 ^ v16) : (vr2 ^ v16);
-      pushNeed(16+k2, need2);
-    }
-  }
-  // 32+
-  if(DECK>32 && v32!=null){
-    for(var k3=1;k3<=31 && 32+k3<DECK;k3++){
-      var bases3=[1,2,4,8,16];
-      var vr3=0, have3=true;
-      for(var i3=0;i<bases3.length;i++){
-        var b3=bases3[i3];
-        if(k3 & b3){
-          var vv3 = (b3===1? v1 : b3===2? v2 : b3===4? v4 : b3===8? v8 : v16);
-          if(vv3==null){ have3=false; break; }
-          vr3 ^= vv3;
-        }
-      }
-      if(!have3) continue;
-      var need3 = (popcount(k3)%2===1 && v0!=null)? (v0 ^ vr3 ^ v32) : (vr3 ^ v32);
-      pushNeed(32+k3, need3);
-    }
-  }
-  return out;
-}
-// Score: how many real pile cards would be placed if we assign `candidate` to basis position `nextPos`
-function placementScore(nextPos, candidate){
-  var vals = currentBasisVals();
-  if(nextPos===0) return 0; // handled by basisSuggestZero()
-  if(nextPos===1) vals.v1 = candidate;
-  else if(nextPos===2) vals.v2 = candidate;
-  else if(nextPos===4) vals.v4 = candidate;
-  else if(nextPos===8) vals.v8 = candidate;
-  else if(nextPos===16) vals.v16 = candidate;
-  else if(nextPos===32) vals.v32 = candidate;
-  else return 0;
-
-  var needs = computeNeedsForMapping(vals);
-
-  // Simulated pile (cards available to move), remove the candidate since it will occupy basis nextPos
-  var sim = pileSetNow();
-  delete sim[candidate];
-
-  var score = 0;
-  for(var i=0;i<needs.length;i++){
-    var need = needs[i].need;
-    if(sim[need]){ score++; delete sim[need]; }
-  }
-  // Placing the candidate itself counts as 1
-  score += 1;
-  return score;
 }
 
 function updateBasisStats(){ 
@@ -966,14 +864,6 @@ function getFaceUpArraySorted(){
   out.sort(function(a,b){return a-b;});
   return out; 
 }
-function getFaceUpSet(){ 
-  var arr=getSelectedIndices(); 
-  var s={}; 
-  for(var i=0;i<arr.length;i++) 
-    s[arr[i]]=1;
-  return s;
-}
-function countQuadsForCard(v, Uarr, Uset){ var cnt=0; for(var i=0;i<Uarr.length;i++){ var b=Uarr[i]; if(b===v) continue; for(var j=i+1;j<Uarr.length;j++){ var c=Uarr[j]; if(c===v) continue; var d=(v^b^c); if(d in Uset && d>c && d!==v && d!==b && d!==c && d<DECK) cnt++; } } return cnt; }
 
 function basisSuggestZero(){
   if (!basis)  return;
@@ -1024,51 +914,6 @@ function basisSuggestZero(){
 }
 
 
-
-// Compute WHICH indices would be placed for a given anchor `next` and candidate `cand`
-// Uses the SAME availability criterion as card-gain: value must be available in the pile (including cand itself).
-function placementDetails(next, cand){
-  try{
-    var v0 = readBasisValue(0);
-    var v1 = readBasisValue(1);
-    var v2 = readBasisValue(2);
-    var v4 = readBasisValue(4);
-    var v8 = readBasisValue(8);
-    var v16 = (next===16 ? cand : readBasisValue(16));
-    var v32 = (next===32 ? cand : readBasisValue(32));
-
-    var exclude = getPlacedValuesSet();
-    var pile = pileCandidateArray(exclude);
-    var pileSet = {}; for (var i=0; i<pile.length; i++) pileSet[pile[i]] = 1;
-    pileSet[cand] = 1; // ensure the candidate itself counts
-
-    function needForIndex(k){
-      var x = 0, bits = k;
-      if ((bits & 1)  && v1  != null) x ^= v1;
-      if ((bits & 2)  && v2  != null) x ^= v2;
-      if ((bits & 4)  && v4  != null) x ^= v4;
-      if ((bits & 8)  && v8  != null) x ^= v8;
-      if ((bits & 16) && v16 != null) x ^= v16;
-      if ((bits & 32) && v32 != null) x ^= v32;
-      var pop = ((k&1)?1:0)+((k&2)?1:0)+((k&4)?1:0)+((k&8)?1:0)+((k&16)?1:0)+((k&32)?1:0);
-      if ((pop % 2)===1 && v0!=null) x ^= v0;
-      return x;
-    }
-
-    var start = next, end = Math.min(DECK-1, 2*next - 1);
-    if (next===32) end = Math.min(DECK-1, 63);
-    if (start==null) return [];
-
-    var indices = [];
-    for (var k=start; k<=end; k++){
-      var req = needForIndex(k);
-      if (req < DECK && pileSet[req]) indices.push(k);
-    }
-    return indices;
-  }catch(_){ return []; }
-}
-
-
 // EXACT auto-fill preview: which indices would actually place now for (next, cand)
 function placementDetailsExactAutoFill(next, cand){
   try{
@@ -1079,15 +924,7 @@ function placementDetailsExactAutoFill(next, cand){
     var v8  = (next===8  ? cand : readBasisValue(8));
     var v16 = (next===16 ? cand : readBasisValue(16));
     var v32 = (next===32 ? cand : readBasisValue(32));
-    function allRequiredAnchorsKnown(k){
-      if ((k & 1)  && v1  == null) return false;
-      if ((k & 2)  && v2  == null) return false;
-      if ((k & 4)  && v4  == null) return false;
-      if ((k & 8)  && v8  == null) return false;
-      if ((k & 16) && v16 == null) return false;
-      if ((k & 32) && v32 == null) return false;
-      return true;
-    }
+
     var pos2val = (basis && basis.pos2val) ? basis.pos2val : [];
 
     var exclude = getPlacedValuesSet();
@@ -1147,6 +984,7 @@ function basisSuggestNext(){
     return;
   }
 
+  // Unified pos1 scoring
   if (next === 1) {
     var Uarr = getFaceUpArraySorted();
     var Uset = {}; for (var i2=0;i2<Uarr.length;i2++) Uset[Uarr[i2]] = 1;
@@ -1172,6 +1010,7 @@ function basisSuggestNext(){
     highlightSuggested(best, why);
     return;
   }
+
   // Unified non-pos1 scoring: exact auto-fill preview drives both score and message
   if (next !== 1){
     var best = null, bestList = [], bestScore = -1;
@@ -1187,17 +1026,6 @@ function basisSuggestNext(){
     highlightSuggested(best, why);
     return;
   }
-
-var best=null, bestScore=-1;
-  for(var c=0;c<candidates.length;c++){
-    var x=candidates[c];
-    var s=placementScore(next, x);
-    if(s>bestScore || (s===bestScore && x<best)){
-      bestScore=s; best=x;
-    }
-  }
-  var why = (best != null) ? ('would place ' + bestScore + ' cards') : null;
-  highlightSuggested(best, why);
 }
 
 var _basisMsgClearScheduled = false;
