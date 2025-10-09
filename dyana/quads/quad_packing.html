@@ -465,7 +465,7 @@ function init(){
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 
 // ===== Basis/Layout =====
-var basis={ pile:null, gridL:null, gridR:null, suggestedIndex:null, pos2val:null, val2pos:null, mappingComplete:false, lockedPos2val:null };
+var basis={ pile:null, gridL:null, gridR:null, pos2val:null, val2pos:null, mappingComplete:false, lockedPos2val:null };
 
 function ensureInitBasisTab(){
   setBasisMsg();
@@ -483,6 +483,17 @@ function makeBasisCell(i){
   if(basisPos.indexOf(i)!==-1) d.classList.add('basis'); 
   return d;
 }
+function addBasisDataDnd(e, n, d) {
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('data-index', String(n)); 
+  var p=d.closest('.cell'); 
+  if(p && p.hasAttribute('data-pos')){ 
+    e.dataTransfer.setData('from','grid'); 
+    e.dataTransfer.setData('fromPos', p.getAttribute('data-pos'));
+  } else { 
+    e.dataTransfer.setData('from','pile');
+  }
+}
 function makeBasisCard(n){ 
   var d=document.createElement('div'); 
   d.className='card faceup'; 
@@ -490,16 +501,11 @@ function makeBasisCard(n){
   d.appendChild(makeFront(n));
   d.setAttribute('draggable','true'); 
   d.addEventListener('dragstart', function(e){ 
-    e.dataTransfer.effectAllowed='move'; 
-    e.dataTransfer.setData('data-index', String(n)); 
-    var p=d.closest('.cell'); 
-    if(p && p.hasAttribute('data-pos')){ 
-      e.dataTransfer.setData('from','grid'); 
-      e.dataTransfer.setData('fromPos', p.getAttribute('data-pos'));
-    } else { 
-      e.dataTransfer.setData('from','pile');
-    }
-  }); 
+    addBasisDataDnd(e, n, d);
+  });
+  d.addEventListener('click', function(e){
+    highlightSuggested(n,'Card selected.')
+  });
   return d;
 }
 function basisCellAt(pos){
@@ -513,15 +519,9 @@ function buildBasisGrid(){
   if(!basis||!basis.gridL||!basis.gridR) return; 
   basis.gridL.innerHTML=''; 
   basis.gridR.innerHTML=''; 
-  if(DECK===64){
-    for(var i=0;i<32;i++) basis.gridL.appendChild(makeBasisCell(i)); 
-    for(var j=32;j<64;j++) basis.gridR.appendChild(makeBasisCell(j)); 
-  } else if(DECK===32){ 
-    for(var a=0;a<16;a++) basis.gridL.appendChild(makeBasisCell(a)); 
-    for(var b=16;b<32;b++) basis.gridR.appendChild(makeBasisCell(b)); 
-  } else { 
-    for(var c=0;c<16;c++) basis.gridL.appendChild(makeBasisCell(c)); 
-  }
+  ends = { 32:[16,32], 16:[16,0] }[DECK] || [32,64];  // default to DECK=64
+  for(var a=0; a<ends[0]; a++) basis.gridL.appendChild(makeBasisCell(a)); 
+  for(var b=ends[0]; b<ends[1]; b++) basis.gridR.appendChild(makeBasisCell(b)); 
   byId('basisGridTitle').textContent='Grid ('+DECK+' places)'; 
   enableBasisDnD();
 }
@@ -532,6 +532,40 @@ function refreshBasisPile(){
   for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i]));
   updateBasisStats();
 }
+function moveBasisCard(pos, cell, idx, from, fromPos) {
+  clearSuggested();
+  cell.classList.remove('drop-ok'); 
+  var node=null; 
+  if(from==='pile'){ 
+    node=basis.pile.querySelector('.card[data-index="'+idx+'"]'); 
+  } else if(from==='grid') {
+    var src=basisCellAt(fromPos); 
+    if(src){
+      node=src.querySelector('.card[data-index="'+idx+'"]')
+      src.innerHTML=''; 
+      src.classList.add('badge'); 
+      src.setAttribute('data-pos', String(fromPos)); 
+      src.setAttribute('data-auto','0'); 
+    } 
+  }
+  if(!node) return; 
+  var prev=cell.querySelector('.card');
+  if(prev && basis && basis.pile){ 
+    prev.classList.remove('basis-placed'); 
+    basis.pile.appendChild(prev);
+  }
+  cell.innerHTML=''; 
+  cell.classList.add('badge'); 
+  cell.setAttribute('data-pos', String(pos)); 
+  cell.setAttribute('data-auto','0'); 
+  if(node){ 
+    node.classList.add('basis-placed');
+  }
+  cell.appendChild(node); 
+  basisAutoFill(); 
+  scheduleclearBasisMsgOnNextClick(); 
+  checkAndLockPositions();
+}
 function enableBasisDnD(){ 
   var droppables=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); 
   droppables.forEach(function(pos){ 
@@ -541,39 +575,21 @@ function enableBasisDnD(){
     cell.addEventListener('dragleave', function(){ cell.classList.remove('drop-ok'); }); 
     cell.addEventListener('drop', function(e){ 
       e.preventDefault(); 
-      cell.classList.remove('drop-ok'); 
       var idx=parseInt(e.dataTransfer.getData('data-index'),10); 
       var from=e.dataTransfer.getData('from'); 
-      var node=null; 
-      if(from==='pile'){ 
-        node=basis.pile.querySelector('.card[data-index="'+idx+'"]'); 
-      } else if(from==='grid') {
-        var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); 
-        var src=basisCellAt(fromPos); 
-        if(src){
-          node=src.querySelector('.card[data-index="'+idx+'"]')
-          src.innerHTML=''; 
-          src.classList.add('badge'); 
-          src.setAttribute('data-pos', String(fromPos)); 
-          src.setAttribute('data-auto','0'); 
-        } 
+      var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); 
+      moveBasisCard(pos, cell, idx, from, fromPos)
+    }); 
+    cell.addEventListener('click', function(e){ 
+      e.preventDefault();
+      var cards = basis.pile.querySelectorAll('.card.suggested');  // get selected cards
+      if (cards && cards.length>0) {
+        var card=cards[0]
+        var idx=card.dataset.index;
+        var from='pile'; 
+        var fromPos=null;  // grid pos not needed
+        moveBasisCard(pos, cell, idx, from, fromPos)
       }
-      if(!node) return; 
-      var prev=cell.querySelector('.card');
-      if(prev && basis && basis.pile){ 
-        prev.classList.remove('basis-placed','suggested'); 
-        basis.pile.appendChild(prev);
-      }
-      cell.innerHTML=''; 
-      cell.classList.add('badge'); 
-      cell.setAttribute('data-pos', String(pos)); 
-      cell.setAttribute('data-auto','0'); 
-      if(node){ node.classList.remove('suggested'); node.classList.add('basis-placed'); }
-      cell.appendChild(node); 
-      basisAutoFill(); 
-      clearSuggested();
-      scheduleclearBasisMsgOnNextClick(); 
-      checkAndLockPositions();
     }); 
   }); 
   basis.pile.addEventListener('dragover', function(e){ e.preventDefault(); }); 
@@ -582,9 +598,13 @@ function enableBasisDnD(){
     var fromPos=parseInt(e.dataTransfer.getData('fromPos')||'-1',10); 
     if(!isNaN(fromPos)){ 
       var src=basisCellAt(fromPos); 
-      if(src){ 
+      if(src){
         var c=src.querySelector('.card'); 
-        if(c){ c.classList.remove('basis-placed','suggested'); basis.pile.appendChild(c); } 
+        if(c){ 
+          c.classList.remove('basis-placed'); 
+          basis.pile.appendChild(c);  // add it to pile
+        } 
+        clearSuggested(); 
         src.innerHTML=''; 
         src.classList.add('badge'); 
         src.setAttribute('data-pos', String(fromPos)); 
@@ -682,7 +702,7 @@ function basisAutoFill(){
   var v32=readBasisValue(32); if(DECK>32 && v32!=null){ for(var k3=1;k3<=31 && 32+k3<DECK;k3++){ var vr3=xorFromLower(k3); if(vr3==null){ resetBasisCell(32+k3); continue; } var need3=(popcount(k3)%2===1 && v0!=null)? (v0 ^ vr3 ^ v32) : (vr3 ^ v32); placeBasisAuto(32+k3, need3); } } else { for(var p3=33;p3<=63 && p3<DECK;p3++) resetBasisCell(p3); }
   updateBasisStats(); 
   snapshotLayoutMapping();
-  reconcileSuggestion();
+  clearSuggested();
 }
 
 // ---- Suggestion scoring by "most cards placed" ----
@@ -815,7 +835,8 @@ function initBasisTab(){
   basis.pile.innerHTML='';
   updateBasisStats();
   var startBtn = byId('basisStartNew'); if(startBtn){ startBtn.onclick = function(){ startNewBasis(); }; }
-  var sn = byId('basisSuggestNext'); if(sn){ 
+  var sn = byId('basisSuggestNext');
+  if(sn){ 
     sn.onclick = basisSuggestNext;
     sn.disabled = false;
   }
@@ -828,13 +849,23 @@ function refreshBasisEverything(){
     showPreBasisGrid(); updateBasisStats();
   }
 }
-function applyMappingToSelect(useLocked){ if(useLocked===void 0) useLocked=false; var map=(useLocked && basis.lockedPos2val)? basis.lockedPos2val : basis.pos2val; if(!map) return; var half=(DECK===64?32:(DECK===32?16:DECK)); for(var p=0;p<DECK;p++){ var val=map[p]; var card=getCardEl(val); if(!card) continue; var targetGrid=(p<half)? gridL : gridR; targetGrid.appendChild(card.closest('.cell')); } }
+function applyMappingToSelect(){ 
+  if(!basis || !basis.lockedPos2val) return; 
+  var half=(DECK===64?32:(DECK===32?16:DECK)); 
+  for(var p=0;p<DECK;p++){ 
+    var val=basis.lockedPos2val[p]; 
+    var card=getCardEl(val); 
+    if(!card) continue; 
+    var targetGrid = (p<half) ? gridL : gridR; 
+    targetGrid.appendChild(card.closest('.cell'));
+  }
+}
 function checkAndLockPositions(){ 
   setBasisMsg();
   snapshotLayoutMapping();
-  if(!basis.mappingComplete){ return; }
+  if(!basis || !basis.mappingComplete){ return; }
   basis.lockedPos2val = basis.pos2val.slice(0);
-  applyMappingToSelect(true);
+  applyMappingToSelect();
   buildPhiGridIfInit();
   showPreBasisGrid();
   if(basis.pile) basis.pile.innerHTML='';
@@ -843,18 +874,19 @@ function checkAndLockPositions(){
   updateDownstreamCounts();
   setBasisMsg('Basis locked: layout applied to all tabs.');
 }
-function resetToStandardLayout(){ 
+function resetToStandardLayout(){
+  if(!basis) return;
   var map=[]; 
-  for(var i=0;i<DECK;i++) map[i]=i;
+  for(var i=0;i<DECK;i++) map[i]=i;  // create standard layout
   basis.pos2val = map.slice();
   basis.val2pos = map.slice();
   basis.lockedPos2val = map.slice();
   basis.mappingComplete = true;
-  applyMappingToSelect(true);
+  applyMappingToSelect();
   showPreBasisGrid();
   updateBasisStats();
   buildPhiGridIfInit();
-  if(basis && basis.pile){ basis.pile.innerHTML=''; }
+  if(basis.pile) basis.pile.innerHTML='';
   setBasisMsg();
 }
 function makeStaticCard(n){ 
@@ -867,15 +899,17 @@ function makeStaticCard(n){
   cell.appendChild(card); 
   return cell;
 }
-function currentPositionMap(){ 
-  if(basis.mappingComplete && basis.lockedPos2val) return basis.lockedPos2val.slice(0); 
-  if(basis.mappingComplete && basis.pos2val) return basis.pos2val.slice(0); 
+function currentPositionMap(){
+  if (basis && basis.mappingComplete) { 
+    if(basis.lockedPos2val) return basis.lockedPos2val.slice(0); 
+    if(basis.pos2val) return basis.pos2val.slice(0); 
+  }
   var m=[]; 
-  for(var i=0;i<DECK;i++) m[i]=i; 
+  for(var i=0;i<DECK;i++) m[i]=i; // create standard layout
   return m;
 }
 function showPreBasisGrid(){ 
-  if(!basis.gridL||!basis.gridR) return; 
+  if(!basis || !basis.gridL || !basis.gridR) return; 
   var map=currentPositionMap(); 
   basis.gridL.innerHTML=''; 
   basis.gridR.innerHTML=''; 
@@ -917,7 +951,8 @@ function clearSuggested() {
 }
 function highlightSuggested(idx,msg) { 
   var el = (idx!=null && basis.pile) ? basis.pile.querySelector('.card[data-index="'+idx+'"]') : null; 
-  if(el) { 
+  if(el) {
+    clearSuggested();  // clear any old suggested
     el.classList.add('suggested'); 
     setBasisMsg(msg || ('Suggested card: '+idx));
   } else { 
@@ -1053,7 +1088,7 @@ function placementDetailsExactAutoFill(next, cand){
       if ((k & 32) && v32 == null) return false;
       return true;
     }
-    var pos2val = (basis && basis.pos2val) ? basis.pos2val : {};
+    var pos2val = (basis && basis.pos2val) ? basis.pos2val : [];
 
     var exclude = getPlacedValuesSet();
     var pile    = pileCandidateArray(exclude);
@@ -1176,7 +1211,6 @@ function scheduleclearBasisMsgOnNextClick(){
   };
   document.addEventListener('click', handler, true);
 }
-function reconcileSuggestion(){ var s=basis.pile?basis.pile.querySelector('.card.suggested'):null; if(!s) return; var idx=+s.dataset.index; var stillInPile = !!(basis.pile.querySelector('.card[data-index="'+idx+'"]')); if(!stillInPile) s.classList.remove('suggested'); }
 
 // ===== Phi Map =====
 var phi={ gridL:null, gridR:null, part:null, initialized:false, flowActive:false, selA:null, selB:null, lastPhi:null, quadsBefore:0, quadsAfter:0 };
