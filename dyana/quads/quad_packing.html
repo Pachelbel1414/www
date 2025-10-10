@@ -165,7 +165,12 @@
             <option value="colsAlt">Alternating Cols</option>
           </select>
         </span>
-        <span id="phiActionPill" class="pill"><button id="phiStart" class="primary">Select Phi Map</button><button id="phiUndo">Undo φ-map</button><button id="phiApply">Apply</button><button id="phiClearSel">Clear</button></span>
+        <span id="phiActionPill" class="pill">
+          <button id="phiStart" class="primary">Select Phi Map</button>
+          <button id="phiUndo">Undo φ-map</button>
+          <button id="phiApply">Apply</button>
+          <button id="phiClearSel">Clear</button>
+        </span>
         <span class="pill"><span class="muted">Quads before</span> <strong id="phiQuadBefore">0</strong></span>
         <span class="pill"><span class="muted">Quads after</span> <strong id="phiQuadAfter"></strong></span></div>
       <div id="phiInfo" class="muted" style="margin:.25rem 0;">Pick a face-up card for <b>b</b> from a purple (B) zone, then a face-down card for <b>a</b> from a gold (A) zone.</div>
@@ -235,7 +240,7 @@ function setAppStatus(t){
 
 // Select tab helpers
 function allCards(){ 
-  return Array.prototype.slice.call(document.querySelectorAll('#bin-grids .card'));
+  return document.querySelectorAll('#bin-grids .card');
 }
 
 function getCardEl(n){ 
@@ -340,7 +345,7 @@ function makeCard(n){
   cell.className='cell';
   var card=document.createElement('div'); 
   card.className='card'; 
-  card.dataset.index=n;
+  card.dataset.index=+n;
   card.appendChild(makeFront(n)); 
   card.appendChild(makeBack());
   card.addEventListener('click', function(){ 
@@ -385,8 +390,16 @@ function updateAppCounts(after){
 
 function wireSelectControls(){
   var reveal=byId('revealAll'), hide=byId('hideAll'), rnd=byId('randomN');
-  if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
-  if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(reveal) reveal.addEventListener('click', function(){ 
+    var cards=allCards(); 
+    for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); 
+    updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit();
+  });
+  if(hide) hide.addEventListener('click', function(){ 
+    var cards=allCards(); 
+    for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); 
+    updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit();
+  });
   if(rnd) rnd.addEventListener('click', function(){
     var n=parseInt(byId('nCount').value||'0',10);  // get number of randoms, default to '0'  
     if (isNaN(n)||n<1) { n=1; } else if (n>DECK) { n=DECK; }  // sanity check n
@@ -396,11 +409,8 @@ function wireSelectControls(){
       if(!set[r]) set[r]=1,count++;
     }
     var cards=allCards();
-    for(var i=0;i<cards.length;i++){ 
-      cards[i].classList.toggle('faceup', set[i]===1);
-    } 
-    updateAppCounts();
-    refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit();
+    for(var i=0;i<cards.length;i++) cards[i].classList.toggle('faceup', set[i]===1);
+    updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit();
   });
   deckSel.addEventListener('change', function(e){ 
     DECK=parseInt(e.target.value,10); 
@@ -511,7 +521,7 @@ function addBasisDataDnd(e, n, d) {
 function makeBasisCard(n){ 
   var d=document.createElement('div'); 
   d.className='card faceup'; 
-  d.dataset.index=n; 
+  d.dataset.index=+n; 
   d.appendChild(makeFront(n));
   d.setAttribute('draggable','true'); 
   d.addEventListener('dragstart', function(e){ 
@@ -700,7 +710,22 @@ function placeBasisAuto(targetPos, idx){
   if(card) destCell.appendChild(card);
 }
 
-function xorFromLower(mask){ var bases=[1,2,4,8,16,32].filter(function(b){return b<DECK;}); var acc=0, have=true; for(var i=0;i<bases.length;i++){ var b=bases[i]; if(mask & b){ var v=readBasisValue(b); if(v==null){ have=false; break; } acc ^= v; } } return have?acc:null; }
+function xorFromLower(mask){ 
+  var bases=[1,2,4,8,16,32].filter(function(b){return b<DECK;}); 
+  var acc=0, have=true; 
+  for(var i=0;i<bases.length;i++){ 
+    var b=bases[i]; 
+    if(mask & b){ 
+      var v=readBasisValue(b); 
+      if(v==null){ 
+        have=false; break;
+      } 
+      acc ^= v;
+    }
+  } 
+  return have?acc:null;
+}
+
 function popcount(x){ var c=0; while(x){ c+=x&1; x>>=1; } return c; }
 function basisAutoFill(){ 
   if(!basis.gridL||!basis.gridR) return; 
@@ -827,7 +852,7 @@ function makeStaticCard(n){
   var cell=document.createElement('div'); cell.className='cell'; 
   var card=document.createElement('div'); card.className='card'; 
   if(isFaceUp(n)) card.classList.add('faceup');
-  card.dataset.index=n; 
+  card.dataset.index=+n; 
   card.appendChild(makeFront(n)); 
   card.appendChild(makeBack()); 
   cell.appendChild(card); 
@@ -895,64 +920,15 @@ function highlightSuggested(idx,msg) {
   }
 }
 
-function getPlacedValuesSet(){ 
-  var set={}; 
-  var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;}); 
-  for(var i=0;i<anchors.length;i++){ 
-    var v=readBasisValue(anchors[i]); 
-    if(v!=null) set[v]=1;
+function pileCandidateArray(){ 
+  if(!basis.pile) return [];
+  var out = [];
+  var cards = basis.pile.querySelectorAll('.card[data-index]');
+  for (var i = 0; i < cards.length; i++) {
+    var v = +cards[i].dataset.index;
+    out.push(v);
   }
-  return set;
-}
-
-function pileCandidateArray(excludeSet){ if(!basis.pile) return []; var els=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]')); var out=[]; for(var i=0;i<els.length;i++){ var v=+els[i].dataset.index; if(!excludeSet || !excludeSet[v]) out.push(v); } return out; }
-
-function basisSuggestZero(){
-  if (!basis)  return;
-  if (basis.mappingComplete) {
-    setBasisMsg('Click "Create new basis" first.');
-    return;
-  }
-  // If already filled, keep the existing message behavior
-  if (readBasisValue(0) != null) {
-    setBasisMsg('Position 0 already placed.');
-    return;
-  }
-  // Universe of face-up cards
-  var Uarr = getSelectedIndicesUniqueSorted();
-  var Uset = {}; for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
-  // Candidates from pile
-  var exclude = getPlacedValuesSet();
-  var candidates = pileCandidateArray(exclude);
-  if (candidates.length === 0) {
-    highlightSuggested(null, null);  // None available
-    return;
-  }
-  // Count quads containing candidate v: for each c in U, let d=v^c^w, iterate w via U and count unique quads.
-  function countQuadsWith(v){
-    var cnt=0;
-    for (var a=0; a<Uarr.length; a++){
-      var c = Uarr[a];
-      if (c===v) continue;
-      for (var b=a+1; b<Uarr.length; b++){
-        var w = Uarr[b];
-        if (w===v || w===c) continue;
-        var d = (v ^ c ^ w);
-        if (Uset[d] && d!==v && d!==c && d!==w && d>w && d<DECK) {
-          cnt++;
-        }
-      }
-    }
-    return cnt;
-  }
-  var best=null, bestScore=-1;
-  for (var k=0;k<candidates.length;k++){
-    var x=candidates[k];
-    var s=countQuadsWith(x);
-    if (s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
-  }
-  var why = (best!=null) ? ('Suggested because it participates in ' + bestScore + ' face-up quads — the strongest starting card.') : null;
-  highlightSuggested(best, why);
+  return out;
 }
 
 // EXACT auto-fill preview: which indices would actually place now for (next, cand)
@@ -968,8 +944,7 @@ function placementDetailsExactAutoFill(next, cand){
 
     var pos2val = (basis && basis.pos2val) ? basis.pos2val : [];
 
-    var exclude = getPlacedValuesSet();
-    var pile    = pileCandidateArray(exclude);
+    var pile    = pileCandidateArray();
     var pileSet = {}; for (var i=0;i<pile.length;i++) pileSet[pile[i]] = 1;
     pileSet[cand] = 1; // ensure candidate counts
 
@@ -1009,50 +984,76 @@ function basisSuggestNext(){
   if (!basis) return;
   if(basis.mappingComplete){ setBasisMsg('Click "Create new basis" first.'); return; }
 
-  // Next unfilled basis among 1,2,4,8,16,32
-  var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;});
+  // Next unfilled basis among anchors
+  var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;});
   var next=null; for(var i=0;i<anchors.length;i++){ if(readBasisValue(anchors[i])==null){ next=anchors[i]; break; } }
   if(next==null){ setBasisMsg('All basis positions are filled.'); return; }
 
-  var exclude=getPlacedValuesSet();
-  var candidates=pileCandidateArray(exclude);
+  // Candidates from pile
+  var candidates=pileCandidateArray();
   if(candidates.length===0){ highlightSuggested(null, null); return; }  // No available
 
-  // Separate logic for picking the best starting (0) card
-  var v0 = readBasisValue(0);
-  if (v0 == null) {
-    basisSuggestZero();
+  // Universe of face-up cards
+  var Uarr = getSelectedIndicesUniqueSorted();
+  var Uset = {}; for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
+
+  // Separate logic for picking the best starting (pos 0) card
+  if (next === 0) {
+    // Count quads containing candidate v: for each c in U, let d=v^c^w, iterate w via U and count unique quads.
+    function countQuadsWith(v){
+      var cnt=0;
+      for (var a=0; a<Uarr.length; a++){
+        var c = Uarr[a];
+        if (c===v) continue;
+        for (var b=a+1; b<Uarr.length; b++){
+          var w = Uarr[b];
+          if (w===v || w===c) continue;
+          var d = (v ^ c ^ w);
+          // tbd ksh !!! since Uarr sorted, i think do not need all the != checks
+          if (Uset[d] && d!==v && d!==c && d!==w && d>w && d<DECK) {
+            cnt++;
+          }
+        }
+      }
+      return cnt;
+    }
+    var best=null, bestScore=-1;
+    for (var k=0;k<candidates.length;k++){
+      var x=candidates[k];
+      var s=countQuadsWith(x);
+      if (s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
+    }
+    var why = (best!=null) ? ('Suggested because it participates in ' + bestScore + ' face-up quads — the strongest starting card.') : null;
+    highlightSuggested(best, why);
     return;
   }
 
-  // Unified pos1 scoring
+  // Unified pos 1 scoring
   if (next === 1) {
-    var Uarr = getSelectedIndicesUniqueSorted();
-    var Uset = {}; for (var i2=0;i2<Uarr.length;i2++) Uset[Uarr[i2]] = 1;
     function countPairQuads(a, b) {
       var cnt = 0;
       for (var i3 = 0; i3 < Uarr.length; i3++) {
         var c = Uarr[i3];
         if (c === a || c === b) continue;
         var d = (a ^ b ^ c);
+        // tbd ksh !!! since Uarr sorted, i think do not need all the != checks
         if (Uset[d] && d !== a && d !== b && d !== c && d > c && d < DECK) cnt++;
       }
       return cnt;
     }
+    var v0  = readBasisValue(0);
     var best = null, bestScore = -1;
     for (var k = 0; k < candidates.length; k++) {
       var x = candidates[k];
       var s = countPairQuads(v0, x);
-      if (s > bestScore || (s === bestScore && x < best)) { bestScore = s; best = x; }
+      if (s>bestScore || (s===bestScore && x<best)) { bestScore=s; best=x; }
     }
-    var why = (best != null)
-      ? ('Suggested because together with the card in position 0, it forms ' + bestScore + ' quads — the strongest pair available.')
-      : null;
+    var why = (best!=null) ? ('Suggested because together with the card in position 0, it forms ' + bestScore + ' quads — the strongest pair available.') : null;
     highlightSuggested(best, why);
     return;
   }
 
-  // Unified non-pos1 scoring: exact auto-fill preview drives both score and message
+  // Unified pos > 1 scoring: exact auto-fill preview drives both score and message
   if (next !== 1){
     var best = null, bestList = [], bestScore = -1;
     for (var j = 0; j < candidates.length; j++){
@@ -1069,7 +1070,7 @@ function basisSuggestNext(){
   }
 }
 
-// this sets up so that the previous bassis msg is cleared on any document click
+// this sets up so that the previous basis msg is cleared on any document click
 var _basisMsgClearScheduled = false;
 function scheduleclearBasisMsgOnNextClick(){
   if(_basisMsgClearScheduled) return;
@@ -1164,8 +1165,8 @@ function buildPartition(mode){
 function enhancePhiGrid(){ 
   var map=currentPositionMap(); 
   var half=(DECK===64?32:(DECK===32?16:DECK)); 
-  var cellsL=Array.prototype.slice.call(byId('phi-grid-left').children); 
-  var cellsR=Array.prototype.slice.call(byId('phi-grid-right').children); 
+  var cellsL=byId('phi-grid-left').children; 
+  var cellsR=byId('phi-grid-right').children; 
   function attach(cell,p){ 
     var v=(p<map.length)? map[p]:null; 
     var cardEl=cell.querySelector('.card'); 
@@ -1202,6 +1203,7 @@ function enhancePhiGrid(){
   for(var i=0;i<cellsL.length;i++) attach(cellsL[i], i);
   for(var j=0;j<cellsR.length;j++) attach(cellsR[j], half+j);
 }
+
 function setPhiInfo(msg){ var el=byId('phiInfo'); if(el){ el.innerHTML=msg; } }
 function updateAHighlights(){ 
   clearATargetShadows(); 
@@ -1286,7 +1288,8 @@ var find = {
   gridL:null, gridR:null,
   selected:[],
   found:[],
-  foundSet:{}
+  foundSet:{},
+  cap:20
 };
 function buildFindGridIfInit(){ if(find.initialized) buildFindGrid(); }
 function initFindTab(){
@@ -1401,17 +1404,15 @@ function checkAndStoreQuad(sel4){
     setFindMsg('You already found that quad.');
     return finishSelection(true);
   }
-  var quads = computeQuadsBasic(getSelectedIndices());
-  var cap = Math.min(20, quads);
-  if(find.found.length >= cap){
-    setFindMsg('List full (' + cap + '). Reset to add more.');
+  if(find.found.length >= find.cap){
+    setFindMsg('List full (' + find.cap + '). Reset to add more.');
     return finishSelection(true);
   }
   var sorted=sel4.slice().sort(function(a,b){return a-b;});
   find.found.push(sorted);
   find.foundSet[key]=1;
   renderFoundList();
-  updateFindCounts(quads);
+  updateFindCounts();
   setFindMsg('✔ Quad recorded!');
   return finishSelection(true);
 }
@@ -1578,10 +1579,10 @@ function updateFindCounts(quads){
   var foundEl = byId('findFoundCount');
   if(!totalEl&&!foundEl) return;
   if (quads == undefined) quads = computeQuadsBasic(getSelectedIndices());
+  find.cap = Math.min(20, quads);
   if(totalEl) totalEl.textContent = quads;
   if(foundEl){ 
-    var cap = Math.min(20, quads); 
-    foundEl.textContent = find.found.length + ' / ' + cap;
+    foundEl.textContent = find.found.length + ' / ' + find.cap;
   }
 }
 
