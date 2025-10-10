@@ -112,7 +112,7 @@
           <option value="32">32</option>
           <option value="16">16</option>
         </select></span>
-        <span class="pill"><span class="muted">Face-up</span> <strong id="upCount">0 / 64</strong></span>
+        <span class="pill"><span class="muted">Face-up</span> <strong id="selectUpCount">0 / 64</strong></span>
         <span class="pill"><span class="muted">Quads</span> <strong id="selectQuadCount">0</strong></span>
       </div>
       <div class="row">
@@ -221,21 +221,27 @@ function shapeSymbol(d) {
   el.className = 'pic';
   el.style.color = d.color;
   if (d.shape=='▲') el.style.letterSpacing = '-3px';  // triangle man, triangle man
-  el.innerHTML = d.shape.repeat(d.count).trim()
+  el.innerHTML = d.shape.repeat(d.count).trim();
   return el;
 }
 
 // ---------- Global state ----------
 var DECK=64;
-var statusEl, deckSel, upCountEl, gridL, gridR;
+var deckSel, gridL, gridR;
+
+function setAppStatus(t){
+  statusEl = byId('status'); if (statusEl) statusEl.textContent = t || '';
+}
 
 // Select tab helpers
 function allCards(){ 
   return Array.prototype.slice.call(document.querySelectorAll('#bin-grids .card'));
 }
+
 function getCardEl(n){ 
   return ((n != null) && (n>=0)) ? document.querySelector('#bin-grids .card[data-index="'+n+'"]') : null;
 }
+
 function isFaceUp(n){ 
   var el=getCardEl(n);
   if(!el) return;
@@ -246,11 +252,6 @@ function setFaceUp(n, up){
   var el=getCardEl(n); 
   if(!el) return; 
   if(up){ el.classList.add('faceup'); } else { el.classList.remove('faceup'); }
-}
-
-function getFaceUpCount() {
-  var cards = document.querySelectorAll('#bin-grids .card.faceup');
-  return cards.length;
 }
 
 function getSelectedIndices(){ 
@@ -264,27 +265,34 @@ function getSelectedIndices(){
 }
 
 function getSelectedIndicesUniqueSorted(){ 
-  var arr=getSelectedIndices(); 
-  var out=[], seen={}; 
+  var arr=getSelectedIndices();
+  // tbd ksh !!! selected should already be unique.  not sure this is necessary.
+  var uniq=[], seen={}; 
   for(var i=0;i<arr.length;i++){ 
     if(!seen[arr[i]]){ 
       seen[arr[i]]=1; 
-      out.push(arr[i]);
-    } 
+      uniq.push(arr[i]);
+    } else {
+      console.error('getSelectedIndicesUniqueSorted: duplicate selected!')
+    }
   }
-  out.sort(function(a,b){return a-b;}); 
-  return out;
+  uniq.sort(function(a,b){return a-b;}); 
+  return uniq;
 }
 
 function computeQuadsBasic(indices){
-  var seen={}, uniq=[]; 
+  // tbd ksh !!! selected should already be unique.  not sure this is necessary.
+  var uniq=[], seen={}; 
   for(var i=0;i<indices.length;i++){ 
     var v=indices[i]; 
     if(!seen[v]){ 
       seen[v]=1; 
       uniq.push(v);
+    } else {
+      console.error('computeQuadsBasic: duplicate selected!')
     }
   }
+  // sorting is required so we can avoid an extra loop
   uniq.sort(function(a,b){return a-b;});
   var cnt=0;
   for(var i1=0;i1<uniq.length;i1++){
@@ -298,13 +306,9 @@ function computeQuadsBasic(indices){
   return cnt;
 }
 
-function updateUpCount(){
-  var up=getFaceUpCount();
-  if (upCountEl) upCountEl.textContent = up + ' / ' + DECK;
-  var qEl = byId('selectQuadCount'); 
-  if(qEl){ qEl.textContent = String(computeQuadsBasic(getSelectedIndices())); 
-  }
-  if (typeof find!=='undefined' && find.initialized) { updateFindCounts(); }
+function updateUpCount(up, quads){
+  var uEl = byId('selectUpCount'); if (uEl) uEl.textContent = up.length + ' / ' + DECK;
+  var qEl = byId('selectQuadCount'); if(qEl) qEl.textContent = quads; 
 }
 
 function makeFront(n){
@@ -339,7 +343,9 @@ function makeCard(n){
   card.dataset.index=n;
   card.appendChild(makeFront(n)); 
   card.appendChild(makeBack());
-  card.addEventListener('click', function(){ card.classList.toggle('faceup'); updateUpCount(); updateDownstreamCounts(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  card.addEventListener('click', function(){ 
+    card.classList.toggle('faceup'); 
+    updateAppCounts(); buildPhiGridIfInit(); buildFindGridIfInit(); });
   cell.appendChild(card); 
   return cell;
 }
@@ -363,21 +369,24 @@ function buildDeck(){
     var targetGrid = (p<half) ? gridL : gridR;
     targetGrid.appendChild(makeCard(p));
   }
-  updateUpCount(); 
-  updateDownstreamCounts();
+  updateAppCounts();
 }
 
-function updateDownstreamCounts(){
-  var quads = String(computeQuadsBasic(getSelectedIndices()))
-  updateBasisStats();
-  var phiBefore = byId('phiQuadBefore'); if(phiBefore && (typeof phi === 'undefined' || !phi || !phi.lastPhi)) phiBefore.textContent = quads;
-  var findTotalEl = byId('findTotalQuads'); if(findTotalEl){ findTotalEl.textContent = quads; }
+function updateAppCounts(after){
+  if (after == undefined)  after = false;
+  var up = getSelectedIndices();
+  var quads = computeQuadsBasic(up);
+  updateUpCount(up, quads); 
+  updateBasisStats(up, quads);
+  if (after) { phi.quadsAfter = quads; } else { phi.quadsBefore = quads; }
+  updatePhiQuadsDisplay();
+  updateFindCounts(quads);
 }
 
 function wireSelectControls(){
   var reveal=byId('revealAll'), hide=byId('hideAll'), rnd=byId('randomN');
-  if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
-  if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(reveal) reveal.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.add('faceup'); updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
+  if(hide) hide.addEventListener('click', function(){ var cards=allCards(); for(var i=0;i<cards.length;i++) cards[i].classList.remove('faceup'); updateAppCounts(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); });
   if(rnd) rnd.addEventListener('click', function(){
     var n=parseInt(byId('nCount').value||'0',10);  // get number of randoms, default to '0'  
     if (isNaN(n)||n<1) { n=1; } else if (n>DECK) { n=DECK; }  // sanity check n
@@ -390,7 +399,8 @@ function wireSelectControls(){
     for(var i=0;i<cards.length;i++){ 
       cards[i].classList.toggle('faceup', set[i]===1);
     } 
-    updateUpCount(); refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit(); 
+    updateAppCounts();
+    refreshIfOnLayout(); buildPhiGridIfInit(); buildFindGridIfInit();
   });
   deckSel.addEventListener('change', function(e){ 
     DECK=parseInt(e.target.value,10); 
@@ -423,9 +433,7 @@ function activateTab(tabId){
 // Boot
 function init(){
   try{
-    statusEl = byId('status');
     deckSel  = byId('deckSize');
-    upCountEl= byId('upCount');
     gridL    = byId('grid-left');
     gridR    = byId('grid-right');
 
@@ -459,9 +467,9 @@ function init(){
       });
     }
 
-    statusEl.textContent='Ready';
+    setAppStatus('Ready');
   } catch(err){
-    if(statusEl) statusEl.textContent='Init error: '+err.message;
+    setAppStatus('Init error: '+err.message);
     console.error(err);
   }
 }
@@ -541,7 +549,7 @@ function refreshBasisPile(){
   var sel=getSelectedIndicesUniqueSorted(); 
   basis.pile.innerHTML=''; 
   for(var i=0;i<sel.length;i++) basis.pile.appendChild(makeBasisCard(sel[i]));
-  updateBasisStats();
+  updateAppCounts();
 }
 
 function resetBasisCell(pos){ 
@@ -726,7 +734,7 @@ function basisAutoFill(){
   } else { 
     for(var p3=33;p3<=63 && p3<DECK;p3++) resetBasisCell(p3);
   }
-  updateBasisStats(); 
+  updateAppCounts(); 
   snapshotLayoutMapping();
   clearSuggested();
 }
@@ -744,20 +752,17 @@ function currentBasisVals(){
   };
 }
 
-function updateBasisStats(){ 
-  var up = getSelectedIndicesUniqueSorted(); 
-  var basisUp = byId('basisUpCount'); if(basisUp) basisUp.textContent = String(up.length); 
-  var basisQ  = byId('basisQuadCount'); if(basisQ) basisQ.textContent = String(computeQuadsBasic(up));
+function updateBasisStats(up, quads){ 
+  var basisUp = byId('basisUpCount'); if(basisUp) basisUp.textContent = up.length; 
+  var basisQ  = byId('basisQuadCount'); if(basisQ) basisQ.textContent = quads;
 }
+
 function initBasisTab(){
   if (!basis)  return;
   basis.pile=byId('basisPile');
   basis.gridL=byId('basis-grid-left');
   basis.gridR=byId('basis-grid-right');
-  setBasisMsg(); 
-  showPreBasisGrid();
-  basis.pile.innerHTML='';
-  updateBasisStats();
+  resetToStandardLayout();
   var startBtn = byId('basisStartNew'); if(startBtn){ startBtn.onclick = function(){ startNewBasis(); }; }
   var sn = byId('basisSuggestNext');
   if(sn){ 
@@ -771,7 +776,7 @@ function refreshBasisEverything(){
   if(!basis.mappingComplete){ 
     buildBasisGrid(); refreshBasisPile(); basisAutoFill();
   } else { 
-    showPreBasisGrid(); updateBasisStats();
+    showPreBasisGrid(); updateAppCounts();
   }
 }
 
@@ -798,8 +803,7 @@ function checkAndLockPositions(){
   showPreBasisGrid();
   if(basis.pile) basis.pile.innerHTML='';
   sn = byId('basisSuggestNext'); if(sn) sn.disabled = true;
-  updateBasisStats();
-  updateDownstreamCounts();
+  updateAppCounts();
   setBasisMsg('Basis locked: layout applied to all tabs.');
 }
 
@@ -813,7 +817,7 @@ function resetToStandardLayout(){
   basis.mappingComplete = true;
   applyMappingToSelect();
   showPreBasisGrid();
-  updateBasisStats();
+  updateAppCounts();
   buildPhiGridIfInit();
   if(basis.pile) basis.pile.innerHTML='';
   setBasisMsg();
@@ -902,11 +906,6 @@ function getPlacedValuesSet(){
 }
 
 function pileCandidateArray(excludeSet){ if(!basis.pile) return []; var els=Array.prototype.slice.call(basis.pile.querySelectorAll('.card[data-index]')); var out=[]; for(var i=0;i<els.length;i++){ var v=+els[i].dataset.index; if(!excludeSet || !excludeSet[v]) out.push(v); } return out; }
-function getFaceUpArraySorted(){ 
-  out = getSelectedIndices(); 
-  out.sort(function(a,b){return a-b;});
-  return out; 
-}
 
 function basisSuggestZero(){
   if (!basis)  return;
@@ -920,7 +919,7 @@ function basisSuggestZero(){
     return;
   }
   // Universe of face-up cards
-  var Uarr = getFaceUpArraySorted();
+  var Uarr = getSelectedIndicesUniqueSorted();
   var Uset = {}; for (var i=0;i<Uarr.length;i++) Uset[Uarr[i]] = 1;
   // Candidates from pile
   var exclude = getPlacedValuesSet();
@@ -1028,7 +1027,7 @@ function basisSuggestNext(){
 
   // Unified pos1 scoring
   if (next === 1) {
-    var Uarr = getFaceUpArraySorted();
+    var Uarr = getSelectedIndicesUniqueSorted();
     var Uset = {}; for (var i2=0;i2<Uarr.length;i2++) Uset[Uarr[i2]] = 1;
     function countPairQuads(a, b) {
       var cnt = 0;
@@ -1086,17 +1085,22 @@ function scheduleclearBasisMsgOnNextClick(){
 // ===== Phi Map =====
 var phi={ gridL:null, gridR:null, part:null, initialized:false, flowActive:false, selA:null, selB:null, lastPhi:null, quadsBefore:0, quadsAfter:0 };
 function buildPhiGridIfInit(){ if(phi.initialized) buildPhiGrid(); }
-function makePhiCard(n){ var cell=document.createElement('div'); cell.className='cell phiCell'; var card=document.createElement('div'); card.className='card'+(isFaceUp(n)?' faceup':''); card.dataset.index=n; 
+function makePhiCard(n){
+  var cell=document.createElement('div'); cell.className='cell phiCell'; var card=document.createElement('div'); 
+  card.className='card'+(isFaceUp(n)?' faceup':''); card.dataset.index=n; 
   card.appendChild(makeFront(n)); 
   card.appendChild(makeBack()); 
   cell.appendChild(card); return cell; }
-function updatePhiQuadsDisplay(){ var beforeEl = byId('phiQuadBefore'); var afterEl = byId('phiQuadAfter'); if(beforeEl) beforeEl.textContent = String(phi.quadsBefore || 0); if(afterEl) afterEl.textContent = (phi.lastPhi ? String(phi.quadsAfter || 0) : ''); }
+function updatePhiQuadsDisplay(){ 
+  var beforeEl = byId('phiQuadBefore'); if (beforeEl) beforeEl.textContent = phi.quadsBefore || 0; 
+  var afterEl = byId('phiQuadAfter'); if (afterEl) afterEl.textContent = phi.lastPhi ? (phi.quadsAfter || 0) : '';
+}
 function buildPhiGrid(){ 
   if(!phi.gridL||!phi.gridR) return; 
   phi.gridL.innerHTML=''; 
   phi.gridR.innerHTML=''; 
   if(!phi.lastPhi && !phi.flowActive){ 
-    phi.quadsBefore = String(computeQuadsBasic(getSelectedIndices()));
+    phi.quadsBefore = computeQuadsBasic(getSelectedIndices());
   }
   var map=currentPositionMap(); 
   phi.part = phi.part || (function(){ var sel=byId('phiPartition'); 
@@ -1122,7 +1126,7 @@ function buildPhiGrid(){
     var targetGrid = (p<half) ? phi.gridL : phi.gridR; 
     targetGrid.appendChild(cell);
   }
-  updatePhiQuadsDisplay(); 
+  updateAppCounts(); 
   enhancePhiGrid(); 
   reapplySelectedAB(); 
   updateAHighlights();
@@ -1217,7 +1221,15 @@ function updateAHighlights(){
   }
 }
 function clearATargetShadows(){ var cards=document.querySelectorAll('#phi-grid-left .card, #phi-grid-right .card'); for(var i=0;i<cards.length;i++){ cards[i].classList.remove('a-shadow'); } }
-function startFlow(){ phi.flowActive=true; phi.selA=null; phi.selB=null; byId('phiApply').disabled=true; phi.quadsBefore = computeQuadsBasic(getSelectedIndices()); updatePhiQuadsDisplay(); setPhiInfo('Flow active: pick b (face-up, purple B), then a (face-down, gold A).'); updateAHighlights(); }
+function startFlow(){ 
+  phi.flowActive=true; 
+  phi.selA=null; 
+  phi.selB=null; 
+  byId('phiApply').disabled=true; 
+  updateAppCounts(); 
+  setPhiInfo('Flow active: pick b (face-up, purple B), then a (face-down, gold A).'); 
+  updateAHighlights();
+}
 function resetFlowUI(){ phi.flowActive=false; phi.selA=null; phi.selB=null; byId('phiApply').disabled=true; clearATargetShadows(); clearSelections(); setPhiInfo('Pick a face-up card for <b>b</b> from a purple (B) zone, then a face-down card for <b>a</b> from a gold (A) zone.'); }
 function clearSelections(){ var cells=document.querySelectorAll('#phi-grid-left .cell, #phi-grid-right .cell'); for(var i=0;i<cells.length;i++){ cells[i].classList.remove('phiSelectedA','phiSelectedB'); } }
 function clearPhiUndo(){ phi.lastPhi=null; var u=byId('phiUndo'); if(u) u.disabled=true; }
@@ -1243,14 +1255,30 @@ function applyFlow(){
   }
   phi.lastPhi={a:a,b:b,swaps:swaps,deck:DECK};
   updateUndoState();
-  updateUpCount();
-  phi.quadsAfter = computeQuadsBasic(getSelectedIndices());
-  updatePhiQuadsDisplay();
+  updateAppCounts(true);  // after
   setPhiInfo('<b>Applied φ-map</b> with <b>b='+b+'</b>, <b>a='+a+'</b>.');
   resetFlowUI();
   buildPhiGrid();
 }
-function undoPhiMap(){ if(!phi.lastPhi) return; if(phi.lastPhi.deck!==DECK){ setPhiInfo('Cannot undo: deck size changed.'); clearPhiUndo(); return; } var s=phi.lastPhi.swaps||[]; for(var i=0;i<s.length;i++){ var f=s[i].from, t=s[i].to; if(isFaceUp(t)) setFaceUp(t,false); if(!isFaceUp(f)) setFaceUp(f,true); } updateUpCount(); phi.quadsAfter = computeQuadsBasic(getSelectedIndices()); updatePhiQuadsDisplay(); setPhiInfo('Undid last φ-map.'); clearPhiUndo(); buildPhiGrid(); }
+
+function undoPhiMap(){ 
+  if(!phi.lastPhi) return; 
+  if(phi.lastPhi.deck!==DECK){ 
+    setPhiInfo('Cannot undo: deck size changed.'); 
+    clearPhiUndo(); 
+    return;
+  }
+  var s=phi.lastPhi.swaps||[]; 
+  for(var i=0;i<s.length;i++){ 
+    var f=s[i].from, t=s[i].to; 
+    if(isFaceUp(t)) setFaceUp(t,false); 
+    if(!isFaceUp(f)) setFaceUp(f,true);
+  }
+  updateAppCounts(true);  // after
+  setPhiInfo('Undid last φ-map.'); 
+  clearPhiUndo(); 
+  buildPhiGrid();
+}
 
 // ===== Find Quads =====
 var find = {
@@ -1373,8 +1401,8 @@ function checkAndStoreQuad(sel4){
     setFindMsg('You already found that quad.');
     return finishSelection(true);
   }
-  var total = computeQuadsBasic(getSelectedIndices());
-  var cap = Math.min(20, total);
+  var quads = computeQuadsBasic(getSelectedIndices());
+  var cap = Math.min(20, quads);
   if(find.found.length >= cap){
     setFindMsg('List full (' + cap + '). Reset to add more.');
     return finishSelection(true);
@@ -1383,7 +1411,7 @@ function checkAndStoreQuad(sel4){
   find.found.push(sorted);
   find.foundSet[key]=1;
   renderFoundList();
-  updateFindCounts();
+  updateFindCounts(quads);
   setFindMsg('✔ Quad recorded!');
   return finishSelection(true);
 }
@@ -1545,15 +1573,15 @@ function resetFoundList(){
   setFindMsg('Found list reset.');
 }
 
-function updateFindCounts(){
+function updateFindCounts(quads){
   var totalEl = byId('findTotalQuads');
   var foundEl = byId('findFoundCount');
   if(!totalEl&&!foundEl) return;
-  var total = computeQuadsBasic(getSelectedIndices());
-  if(totalEl) totalEl.textContent = String(total);
+  if (quads == undefined) quads = computeQuadsBasic(getSelectedIndices());
+  if(totalEl) totalEl.textContent = quads;
   if(foundEl){ 
-    var cap = Math.min(20, total); 
-    foundEl.textContent = String(find.found.length) + ' / ' + cap;
+    var cap = Math.min(20, quads); 
+    foundEl.textContent = find.found.length + ' / ' + cap;
   }
 }
 
