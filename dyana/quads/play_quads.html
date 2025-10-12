@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Play Quads</title>
+  <style>
+    :root{
+      --bg:#fafafa; --ink:#111; --muted:#6b7280; --border:#e5e7eb;
+      --accent:#2563eb; --good:#16a34a; --bad:#dc2626;
+      --card-h: 90px; --card-w: 130px; --card-r: 12px; --card-bg:#fff;
+      --bg00:#ffe5ef; --bg01:#e6fbe9; --bg10:#ffe9cc; --bg11:#e6f3ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+    .app{max-width:1100px;margin:0 auto;padding:16px}
+    h1{margin:0 0 6px 0;font-size:20px}
+    .status{font-size:13px;color:var(--muted);margin-bottom:10px;min-height:18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+    label{font-weight:700}
+    select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff}
+    button{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;font-weight:700}
+    button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    button.good{background:var(--good);border-color:var(--good);color:#fff}
+    .pill{display:inline-flex;gap:10px;align-items:center;font-weight:800;border-radius:999px;padding:6px 12px}
+    .pill.info{background:#eef2ff;border:1px solid #e0e7ff}
+    .pill.found{background:#ecfdf5;border:1px solid #d1fae5}
+    .pill .sep{opacity:.6}
+
+    .grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill, minmax(var(--card-w), 1fr));justify-content:center}
+    .cell{border-radius:var(--card-r);display:flex;justify-content:center}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--border);
+      border-radius:var(--card-r);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      position:relative;overflow:hidden;cursor:pointer;
+      height:var(--card-h);width:var(--card-w);
+      box-shadow:0 1px 0 rgba(0,0,0,0.03), 0 2px 10px rgba(0,0,0,0.03);
+      transition:transform .08s ease;
+    }
+    .card:active{ transform:scale(0.97); }
+
+    .pic{font-family:"Times New Roman","Segoe UI Symbol","Noto Sans Symbols","Arial Unicode MS",sans-serif;font-size:22px;line-height:1;color:#111;flex-grow:1;display:flex;align-items:center;justify-content:center;}
+    .bin{
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-size:11px;
+      color:#6b7280;
+      position:absolute;
+      bottom:4px;
+      left:0;right:0;
+      text-align:center;
+    }
+
+    .card.selected{outline:3px solid #f59e0b; outline-offset:2px;}
+    .card.hint{outline:3px dashed #2563eb; outline-offset:2px;}
+
+    @keyframes flash{0%{filter:brightness(1)}50%{filter:brightness(1.15)}100%{filter:brightness(1)}}
+    .flash{animation:flash .6s ease}
+    /* Toggle binary visibility */
+    .hide-bins .bin{ display:none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Play Quads</h1>
+    <div id="status" class="status">(initializing…)</div>
+
+    <div class="row">
+      <label for="deckSel">Deck:</label>
+      <select id="deckSel">
+        <option value="256">256</option>
+        <option value="128">128</option>
+        <option value="64" selected>64</option>
+        <option value="32">32</option>
+        <option value="16">16</option>
+      </select>
+      <button id="newDeal" class="primary">New deal</button>
+
+      <!-- Light blue pill with Layout + Quads -->
+      <span class="pill info">
+        <span>Layout</span> <strong id="layoutCount">0</strong>
+        <span class="sep">•</span>
+        <span>Quads</span> <strong id="quadCount">0</strong>
+      </span>
+
+      <span class="pill found"><span>Found</span> <strong id="foundCount">0</strong></span>
+    </div>
+
+    <div class="row">
+      <button id="checkQuad" class="good">Check selected (4)</button>
+      <button id="hintBtn">Hint</button>
+      <label class="bin-toggle" style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;">
+        <input type="checkbox" id="toggleBin" checked>
+        <span>Show binary</span>
+      </label>
+      <span id="msg" class="status"></span>
+    </div>
+
+    <div id="grid" class="grid"></div>
+  </div>
+
+<script>
+function pad6(n){ return n.toString(2).padStart(6,'0'); }
+function bits7_8(n){ const code = (n >> 6) & 0b11; return code.toString(2).padStart(2,'0'); }
+function pad8(n){ return n.toString(2).padStart(8,'0'); }
+function bgColorFor(n){
+  const b = bits7_8(n);
+  const root = getComputedStyle(document.documentElement);
+  if(b==="00") return root.getPropertyValue('--bg00').trim() || "#ffe5ef";
+  if(b==="01") return root.getPropertyValue('--bg01').trim() || "#e6fbe9";
+  if(b==="10") return root.getPropertyValue('--bg10').trim() || "#ffe9cc";
+  if(b==="11") return root.getPropertyValue('--bg11').trim() || "#e6f3ff";
+  return '#ffffff';
+}
+function decodeBits(bits){
+  const color={"00":"#ef4444","01":"#10b981","10":"#f59e0b","11":"#3b82f6"}[bits.slice(0,2)];
+  const shape={"00":"\u25CF","01":"\u25B2","10":"\u25A0","11":"\u2665"}[bits.slice(2,4)];
+  const count={"00":1,"01":2,"10":3,"11":4}[bits.slice(4,6)];
+  return {color,shape,count};
+}
+function makeBitString(n){
+  if(DECK === 16){ return n.toString(2).padStart(4,'0'); }
+  if(DECK >= 128){ return pad8(n); }
+  const low = n % 64;
+  return pad6(low);
+}
+function makeFront(n){
+  const low = n % 64;
+  const bits6=pad6(low);
+  const {color,shape,count}=decodeBits(bits6);
+  const front=document.createElement('div'); front.className='front';
+  const pic=document.createElement('div'); pic.className='pic'; pic.style.color=color; pic.textContent=shape.repeat(count).trim();
+  const bin=document.createElement('div'); bin.className='bin'; bin.textContent=makeBitString(n);
+  front.appendChild(pic); front.appendChild(bin);
+  return front;
+}
+function makeCard(n, onClick){
+  const cell=document.createElement('div'); cell.className='cell';
+  const card=document.createElement('div'); card.className='card'; card.dataset.index=n;
+  card.style.background = bgColorFor(n);
+  card.appendChild(makeFront(n));
+  card.addEventListener('click',()=>onClick(card));
+  cell.appendChild(card);
+  return cell;
+}
+
+const grid = document.getElementById('grid');
+const deckSel = document.getElementById('deckSel');
+const msg = document.getElementById('msg');
+const statusEl = document.getElementById('status');
+const layoutCountEl = document.getElementById('layoutCount');
+const quadCountEl = document.getElementById('quadCount');
+const foundCountEl = document.getElementById('foundCount');
+
+let DECK = 64;
+let baseLayout = 8;
+let stock = [];
+let layout = [];
+let found = 0;
+let selected = new Set();
+let currentHint = [];
+
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+function resetDeck(){ const N = DECK; stock = Array.from({length:N}, (_,i)=>i); shuffle(stock); }
+function computeQuadsIn(values){
+  const present = new Set(values);
+  const uniq = Array.from(present).sort((a,b)=>a-b);
+  let quads = [];
+  for(let i=0;i<uniq.length;i++){
+    for(let j=i+1;j<uniq.length;j++){
+      for(let k=j+1;k<uniq.length;k++){
+        const a=uniq[i], b=uniq[j], c=uniq[k];
+        const d=a^b^c;
+        if(d>c && present.has(d) && d<DECK) quads.push([a,b,c,d]);
+      }
+    }
+  }
+  return quads;
+}
+function hasAtLeastOneQuad(values){ return computeQuadsIn(values).length>0; }
+
+function ensureQuadExists(){
+  let added = 0;
+  while(!hasAtLeastOneQuad(layout) && stock.length>0){
+    layout.push(stock.pop());
+    added++;
+  }
+  if(added>0) announce('Added '+added+' card'+(added>1?'s':'')+' to ensure a quad.');
+}
+
+function render(){
+  grid.innerHTML='';
+  layout.forEach(v=>{
+    const card = makeCard(v, (el)=>toggleSelect(el));
+    if(selected.has(v)) card.querySelector('.card').classList.add('selected');
+    grid.appendChild(card);
+  });
+  layoutCountEl.textContent = String(layout.length);
+  quadCountEl.textContent = String(computeQuadsIn(layout).length);
+  foundCountEl.textContent = String(found);
+}
+
+function toggleSelect(cardEl){
+  const v = +cardEl.dataset.index;
+  if(selected.has(v)) selected.delete(v); else selected.add(v);
+  cardEl.classList.toggle('selected');
+  flash(cardEl);
+  clearHints();
+}
+
+function flash(el){ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function clearHints(){
+  document.querySelectorAll('.card.hint').forEach(c=>c.classList.remove('hint'));
+  currentHint = [];
+}
+
+function baseForDeck(N){
+  if(N===256) return 10;
+  if(N===128) return 9;
+  if(N===64) return 8;
+  if(N===32) return 7;
+  return 6;
+}
+
+function newDeal(){
+  selected.clear(); found = 0; resetDeck(); layout = [];
+  baseLayout = baseForDeck(DECK);
+  while(layout.length < baseLayout && stock.length>0) layout.push(stock.pop());
+  ensureQuadExists();
+  announce('New deal: '+layout.length+' cards on table.');
+  render();
+}
+
+function replenishToBase(){
+  while(layout.length < baseLayout && stock.length>0) layout.push(stock.pop());
+  ensureQuadExists();
+}
+
+function checkSelected(){
+  if(selected.size!==4){ announce('Pick exactly 4 cards.', true); return; }
+  const arr = Array.from(selected).sort((a,b)=>a-b);
+  const isQuad = ((arr[0]^arr[1]^arr[2]^arr[3])===0);
+  if(isQuad){
+    const setSel = new Set(arr);
+    layout = layout.filter(v=>!setSel.has(v));
+    selected.clear();
+    found++;
+    announce('Quad! Removed 4 cards and replenished.', false);
+    replenishToBase(); render();
+  }else{ announce('Not a quad. (XOR of 4 must be 0)', true); }
+}
+
+// Updated hint logic per spec
+function showHint(){
+  clearHints();
+  const allQuads = computeQuadsIn(layout);
+  const sel = Array.from(selected);
+
+  if(sel.length === 0){
+    // No selection: show one random card from a random quad
+    if(allQuads.length === 0){ announce('No quads found to hint.', true); return; }
+    const q = allQuads[Math.floor(Math.random()*allQuads.length)];
+    const one = q[Math.floor(Math.random()*q.length)];
+    const card = grid.querySelector('.card[data-index="'+one+'"]');
+    if(card) card.classList.add('hint');
+    setTimeout(clearHints, 3000);
+    return;
+  }
+
+  // With selection: find a quad that contains ALL selected cards
+  const match = allQuads.find(q => sel.every(x => q.includes(x)));
+  if(!match){
+    announce('No quads exist with current selection.', true);
+    return;
+  }
+
+  // If already a complete quad selected
+  if(sel.length === 4 && ((sel[0]^sel[1]^sel[2]^sel[3])===0)){
+    announce('Those 4 already form a quad!', false);
+    return;
+  }
+
+  // Highlight one additional card from that quad
+  const missing = match.filter(v => !selected.has(v));
+  if(missing.length > 0){
+    const next = missing[0];
+    const card = grid.querySelector('.card[data-index="'+next+'"]');
+    if(card) card.classList.add('hint');
+    setTimeout(clearHints, 3000);
+  }else{
+    announce('Those 4 already form a quad!', false);
+  }
+}
+
+function announce(text, bad){ msg.textContent = text; msg.style.color = bad ? '#b91c1c' : '#4b5563'; }
+
+document.getElementById('newDeal').addEventListener('click', newDeal);
+document.getElementById('checkQuad').addEventListener('click', checkSelected);
+document.getElementById('hintBtn').addEventListener('click', showHint);
+
+deckSel.addEventListener('change', (e)=>{ DECK = parseInt(e.target.value,10); baseLayout = baseForDeck(DECK); newDeal(); });
+
+function init(){ DECK = parseInt(deckSel.value,10); baseLayout = baseForDeck(DECK); newDeal(); statusEl.textContent = 'Ready'; }
+if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+// Binary visibility toggle
+const toggleBin = document.getElementById('toggleBin');
+function applyBinVisibility(on){
+  document.body.classList.toggle('hide-bins', !on);
+  try{ localStorage.setItem('showBin', on ? '1' : '0'); }catch(e){}
+}
+if(toggleBin){
+  // Load saved pref
+  let saved = null;
+  try{ saved = localStorage.getItem('showBin'); }catch(e){ saved = null; }
+  const initial = saved === null ? true : (saved === '1');
+  toggleBin.checked = initial;
+  applyBinVisibility(initial);
+  toggleBin.addEventListener('change', (e)=>applyBinVisibility(e.target.checked));
+}
+
+</script>
+</body>
+</html>
