@@ -557,9 +557,9 @@ function resetBasisCell(pos){
   var cell = basisCellAt(pos); 
   if (!cell) return;
   // should only be one card, if any, and every card should have data-index
-  var card=cell.querySelector('[data-index]');
-  if (card && basis && basis.pile){
-    // if card in cell, move it to pile
+  var card=cell.querySelector('.card [data-index]');
+  if (card && basis.pile){
+    // if card (!backcard) in cell, move it to pile
     card.classList.remove('basis-manual');
     basis.pile.appendChild(card);  // will not add a dupe
   } 
@@ -865,7 +865,7 @@ function makeStaticCard(n){
 }
 
 function currentPositionMap(){
-  if (basis && basis.mappingComplete) { 
+  if (basis.mappingComplete) { 
     if (basis.lockedPos2val) return basis.lockedPos2val.slice(); // copy
     if (basis.pos2val) return basis.pos2val.slice(); // copy
   }
@@ -905,7 +905,7 @@ function startNewBasis(){
 
 // Suggestion helpers
 function clearSuggested() {
-  if (basis && basis.pile){
+  if (basis.pile){
     var cards = basis.pile.querySelectorAll('.card.suggested');
     for (var i = 0; i < cards.length; i++) {
       cards[i].classList.remove('suggested');
@@ -940,7 +940,7 @@ function placementDetailsExactAutoFill(pileSet, next, cand){  // ensure candidat
   var aV = {}; [0,1,2,4,8,16,32].forEach(function(a) { aV[a] = readBasisValue(a); });
   aV[next] = cand;   // if next > 1
 
-  var pos2val = (basis && basis.pos2val) ? basis.pos2val : [];
+  var pos2val = (basis.pos2val) ? basis.pos2val : [];
   var mask = (next - 1);
 
   function needForIndex(k){
