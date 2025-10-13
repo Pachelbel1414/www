@@ -602,8 +602,12 @@ function moveBasisCard(to, toPos, idx, from, fromPos) {
 }
 
 function enableBasisDnD(){ 
-  for(var toPos=0;toPos<DECK;toPos++){
-    var destCell = basisCellAt(toPos); if (!destCell) continue; 
+  // tbd ksh !!! for now allow allow dropping on anchors
+  // for(var toPos=0;toPos<DECK;toPos++){
+  [0,1,2,4,8,16,32].forEach(function(toPos) { 
+    var destCell = basisCellAt(toPos); 
+    // if (!destCell) continue; 
+    if (!destCell) return; 
     // use IIFE to get new instance of toPos, destCell
     (function(toPos, destCell) {
       destCell.addEventListener('dragover', function(e){ e.preventDefault(); destCell.classList.add('drop-ok'); }); 
@@ -625,7 +629,8 @@ function enableBasisDnD(){
         }
       }); 
     })(toPos, destCell);
-  } 
+  });
+  //} 
   basis.pile.addEventListener('dragover', function(e){ e.preventDefault(); }); 
   basis.pile.addEventListener('drop', function(e){
     // drag from grid->pile 
