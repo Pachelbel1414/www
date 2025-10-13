@@ -294,6 +294,8 @@ function updateUpCount(up, quads){
   var qEl = byId('selectQuadCount'); if (qEl) qEl.textContent = quads; 
 }
 
+
+
 function makeFront(n){
   var bits=pad6(n), d=decodeBits(bits);
   var front=document.createElement('div'); 
@@ -302,6 +304,11 @@ function makeFront(n){
   var labels=document.createElement('div'); 
   labels.className='labels';
   labels.textContent = bits;
+
+  // NEW: honor the current checkbox when a card/front is created
+  var cb = byId('showLabels');
+  if (cb && cb.checked) labels.style.display = 'inline';
+
   front.appendChild(pic); 
   front.appendChild(labels);
   return front;
@@ -431,7 +438,8 @@ function activateTab(tabId){
   }
   if (tabId=='tab-layout'){ ensureInitBasisTab(); refreshBasisEverything(); }
   if (tabId=='tab-phi'){ if (!phi.initialized) initPhiTab(); else buildPhiGrid(); }
-  if (tabId=='tab-find'){ if (!find.initialized) initFindTab(); else buildFindGrid(); }
+  if (tabId=='tab-find'){ if (!find.initialized) initFindTab(); else buildFindGrid();
+  }
 }
 
 // Boot
@@ -1083,12 +1091,20 @@ function updatePhiQuadsDisplay(){
   var beforeEl = byId('phiQuadBefore'); if (beforeEl) beforeEl.textContent = phi.quadsBefore || 0; 
   var afterEl = byId('phiQuadAfter'); if (afterEl) afterEl.textContent = phi.lastPhi ? (phi.quadsAfter || 0) : '';
 }
+// Helper: fire the dropdown change event so the purple/gold updates immediately
+function triggerPhiDropdown(){
+  const dd = document.querySelector('#phiPartition');
+  if (dd){
+    dd.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
 function buildPhiGrid(){ 
   if (!phi.gridL || !phi.gridR) return; 
   phi.gridL.innerHTML=''; 
   phi.gridR.innerHTML=''; 
   if (!phi.lastPhi && !phi.flowActive){ 
     phi.quadsBefore = computeQuadsBasic(getSelectedIndicesSorted());
+  triggerPhiDropdown();
   }
   var map=currentPositionMap(); 
   phi.part = phi.part || (function(){ var sel = byId('phiPartition'); 
