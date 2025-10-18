@@ -605,7 +605,9 @@ function moveBasisCard(to, toPos, idx, from, fromPos) {
   // check if this triggers any auto changes
   basisAutoFill(); 
   scheduleclearBasisMsgOnNextClick();
-  // if this fills in last basis pos or uses last card from pile, lock it down
+  // If the pile is empty, auto-pick a random FACE-DOWN card for next anchor and complete spans.
+  fillUntilCompleteFromFaceDown();
+  // Now see if the mapping is complete and lock if so.
   checkAndLockPositions();
 }
 
@@ -649,6 +651,94 @@ function enableBasisDnD(){
   });
 }
 
+
+// --- Auto-fill when pile runs out: pick a random FACE-DOWN card and continue ---
+function basisUsedSet(){
+  var used = {};
+  var els = document.querySelectorAll('#basis-grid .card[data-index], #basis-grid .backcard[data-index]');
+  for (var i=0; i<els.length; i++){
+    var v = +els[i].dataset.index;
+    if (!isNaN(v)) used[v] = 1;
+  }
+  return used;
+}
+function nextUnfilledAnchor(){
+  var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;});
+  for (var i=0;i<anchors.length;i++){
+    if (readBasisValue(anchors[i])==null) return anchors[i];
+  }
+  return null;
+}
+function autoFillFromFaceDownIfPileEmpty(){
+  if (!basis || !basis.pile) return false;
+  var hasCard = basis.pile.querySelector('.card');
+  if (hasCard) return false; // nothing to do
+
+  var pos = nextUnfilledAnchor();
+  if (pos==null) return false;
+
+  var used = basisUsedSet();
+  var choices = [];
+  for (var v=0; v<DECK; v++){
+    if (!isFaceUp(v) && !used[v]) choices.push(v);
+  }
+  if (choices.length==0) return false;
+
+  var pick = choices[Math.floor(Math.random()*choices.length)];
+  // Place a face-down placeholder into the anchor
+  var cell = basisCellAt(pos);
+  if (!cell) return false;
+  resetBasisCell(pos);
+  cell.appendChild(makeFaceDownPlaceholder(pick));
+
+  // Now complete the span with placeholders where needed
+  basisAutoFill();
+  return true;
+}
+function gridIsFullyPlaced(){
+  for (var p=0; p<DECK; p++){
+    if (readBasisValue(p)==null) return false;
+  }
+  return true;
+}
+function fillUntilCompleteFromFaceDown(){
+  var changed = false;
+  var guard = 0;
+  // First, keep picking random face-down values for anchors until all anchors are filled
+  while (nextUnfilledAnchor()!=null && guard < DECK+10){
+    guard++;
+    // if pile has cards, stop; user can keep placing
+    if (basis && basis.pile && basis.pile.querySelector('.card')) break;
+    if (!autoFillFromFaceDownIfPileEmpty()) break;
+    changed = true;
+  }
+  // With anchors filled (or no more face-down choices), run auto-fill to populate spans
+  basisAutoFill();
+  // If still any empty positions (shouldn't happen with our placeholders), try a final pass:
+  if (!gridIsFullyPlaced()){
+    // place placeholders directly for any empty positions using their needed value if anchors known
+    var a0 = readBasisValue(0);
+    var anchors=[1,2,4,8,16,32].filter(function(x){return x<DECK;});
+    var haveAllAnchors = (a0!=null);
+    for (var i=0;i<anchors.length;i++){ if (readBasisValue(anchors[i])==null){ haveAllAnchors=false; break; } }
+    if (haveAllAnchors){
+      // compute required values using existing helper xorFromLower / popcount logic via basisAutoFill's path:
+      for (var p=0; p<DECK; p++){
+        if (readBasisValue(p)!=null) continue;
+        // force a placeholder with its required value by asking basisAutoFill to do it via placeBasisAuto
+        // Since basisAutoFill iterates known patterns, call it again
+        basisAutoFill();
+        if (readBasisValue(p)==null){
+          // As a last resort, put a generic placeholder with index p (fallback)
+          var cell = basisCellAt(p);
+          if (cell) { resetBasisCell(p); cell.appendChild(makeFaceDownPlaceholder(p)); }
+        }
+      }
+    }
+  }
+  return changed;
+}
+
 function readBasisValue(pos){ 
   var cell = basisCellAt(pos); 
   if (!cell) return null;
@@ -658,36 +748,33 @@ function readBasisValue(pos){
 }
 
 function snapshotLayoutMapping(){ 
-  if (basis){
-    /* check if all suggestions placed */
-    var allPlaced=false;
-    if (basis.pile){
-        var hasCard = basis.pile.querySelector('.card');
-        if (!hasCard){
-          allPlaced=true
-        }
+  if (!basis) return;
+  // Require all anchor basis positions to be filled before declaring complete.
+  var anchors=[0,1,2,4,8,16,32].filter(function(x){return x<DECK;});
+  for (var i=0;i<anchors.length;i++){
+    if (readBasisValue(anchors[i])==null){
+      basis.mappingComplete=false; 
+      basis.pos2val=null; 
+      basis.val2pos=null; 
+      return;
     }
-    /* check if any empty destinations */
-    var pos2=[], val2=Array(DECK); 
-    for(var p=0;p<DECK;p++){ 
-      var v=readBasisValue(p); 
-      if (v==null) { 
-        /* if not all placed and empty destination */
-        if (!allPlaced){
-          basis.mappingComplete=false; 
-          basis.pos2val=null; 
-          basis.val2pos=null; 
-          return;
-        }
-      } else {
-        pos2[p]=v; 
-        val2[v]=p;
-      }
-    } 
-    basis.pos2val=pos2; 
-    basis.val2pos=val2; 
-    basis.mappingComplete=true;
   }
+  // Build full position/value maps. Any null v means mapping is not ready yet.
+  var pos2=[], val2=Array(DECK); 
+  for (var p=0;p<DECK;p++){ 
+    var v=readBasisValue(p); 
+    if (v==null){ 
+      basis.mappingComplete=false; 
+      basis.pos2val=null; 
+      basis.val2pos=null; 
+      return;
+    }
+    pos2[p]=v; 
+    val2[v]=p;
+  } 
+  basis.pos2val=pos2; 
+  basis.val2pos=val2; 
+  basis.mappingComplete=true;
 }
 
 function placeBasisAuto(targetPos, idx){
@@ -828,12 +915,14 @@ function refreshBasisEverything(){
 // this updates the deck grids
 function applyMappingToSelect(){ 
   if (!basis.lockedPos2val) return; 
-  for(var p=0;p<DECK;p++){ 
+  for (var p=0; p<DECK; p++){ 
     var val = basis.lockedPos2val[p]; 
-    var card=getCardEl(val); 
+    var card = getCardEl(val); 
     if (!card) continue; 
-    var targetGrid = (p<HALF) ? gridL : gridR; 
-    targetGrid.appendChild(card.closest('.cell'));
+    var cell = card.closest('.cell');
+    var parent = (p<HALF) ? gridL : gridR; 
+    var idx = (p<HALF) ? p : (p - HALF);
+    parent.insertBefore(cell, parent.children[idx] || null);
   }
 }
 
@@ -1100,39 +1189,44 @@ function triggerPhiDropdown(){
 }
 function buildPhiGrid(){ 
   if (!phi.gridL || !phi.gridR) return; 
-  phi.gridL.innerHTML=''; 
-  phi.gridR.innerHTML=''; 
-  if (!phi.lastPhi && !phi.flowActive){ 
-    phi.quadsBefore = computeQuadsBasic(getSelectedIndicesSorted());
-  triggerPhiDropdown();
-  }
-  var map=currentPositionMap(); 
-  phi.part = phi.part || (function(){ var sel = byId('phiPartition'); 
-    var mode; 
-    if (DECK==16){ 
-      mode='rowsdbl'; 
-      if (sel) sel.value='rowsdbl';
-    } else { 
-      mode = sel ? sel.value : 'lr';
-    } 
-    return buildPartition(mode);
-  })();
-  for(var p=0;p<DECK;p++){ 
-    var v=map[p]; 
-    var cell=makePhiCard(v); 
-    cell.dataset.pos=String(p); 
-    if (phi.part && phi.part[p]=='A'){ 
-      cell.classList.add('phiA');
-    } else if (phi.part && phi.part[p]=='B'){
-      cell.classList.add('phiB');
+  if (phi._building) return; 
+  phi._building = true;
+  try {
+    phi.gridL.innerHTML=''; 
+    phi.gridR.innerHTML=''; 
+    if (!phi.lastPhi && !phi.flowActive){ 
+      phi.quadsBefore = computeQuadsBasic(getSelectedIndicesSorted());
     }
-    var targetGrid = (p<HALF) ? phi.gridL : phi.gridR; 
-    targetGrid.appendChild(cell);
+    var map=currentPositionMap(); 
+    phi.part = phi.part || (function(){ var sel = byId('phiPartition'); 
+      var mode; 
+      if (DECK==16){ 
+        mode='rowsdbl'; 
+        if (sel) sel.value='rowsdbl';
+      } else { 
+        mode = sel ? sel.value : 'lr';
+      } 
+      return buildPartition(mode);
+    })();
+    for(var p=0;p<DECK;p++){ 
+      var v=map[p]; 
+      var cell=makePhiCard(v); 
+      cell.dataset.pos=String(p); 
+      if (phi.part && phi.part[p]=='A'){ 
+        cell.classList.add('phiA');
+      } else if (phi.part && phi.part[p]=='B'){
+        cell.classList.add('phiB');
+      }
+      var targetGrid = (p<HALF) ? phi.gridL : phi.gridR; 
+      targetGrid.appendChild(cell);
+    }
+    updateAppCounts(); 
+    enhancePhiGrid(); 
+    reapplySelectedAB(); 
+    updateAHighlights();
+  } finally {
+    phi._building = false;
   }
-  updateAppCounts(); 
-  enhancePhiGrid(); 
-  reapplySelectedAB(); 
-  updateAHighlights();
 }
 function initPhiTab(){ phi.gridL = byId('phi-grid-left'); phi.gridR = byId('phi-grid-right'); updatePartitionDisables(); var sel = byId('phiPartition'); var mode; if (DECK==16){ mode='rowsdbl'; if (sel) sel.value='rowsdbl'; } else { mode = sel ? sel.value : 'lr'; } phi.part = buildPartition(mode); buildPhiGrid(); if (sel){ sel.addEventListener('change', function(){ phi.part = buildPartition(sel.value); buildPhiGrid(); resetFlowUI(); clearPhiUndo(); }); } byId('phiStart').onclick=startFlow; byId('phiApply').onclick=applyFlow; byId('phiClearSel').onclick=function(){ resetFlowUI(); buildPhiGrid(); }; byId('phiUndo').onclick=undoPhiMap; phi.initialized = true; }
 function reapplySelectedAB(){ if (phi.selA==null && phi.selB==null) return; function mark(index, cls){ if (index==null) return; var el=document.querySelector('#phi-grid-left .card[data-index="'+index+'"], #phi-grid-right .card[data-index="'+index+'"]'); if (el){ var cell=el.closest('.cell'); if (cell) cell.classList.add(cls); } } mark(phi.selB,'phiSelectedB'); mark(phi.selA,'phiSelectedA'); }
