@@ -1,0 +1,274 @@
+from timeit import default_timer as timer
+import random
+
+COLORS = [ 'R', 'Y' ]
+MAX_ROW = 6
+MAX_COL = 7  # should be < 10
+
+board1 = [
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', 'R', '.', '.', '.' ],
+    [ '.', '.', '.', 'Y', 'R', '.', '.' ],
+    [ '.', '.', '.', 'Y', 'Y', 'R', '.' ],
+    [ '.', '.', '.', 'Y', 'R', 'Y', 'R' ]
+] 
+ 
+board2 = [ 
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', 'R' ],
+    [ '.', '.', '.', '.', '.', 'R', 'Y' ],
+    [ '.', '.', '.', '.', 'R', 'Y', 'Y' ],
+    [ '.', '.', '.', 'R', 'Y', 'R', 'Y' ]
+] 
+ 
+board3 = [ 
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', 'R' ],
+    [ '.', '.', '.', '.', '.', 'Y', 'R' ],
+    [ '.', '.', '.', '.', 'Y', 'Y', 'R' ],
+    [ '.', '.', '.', 'Y', 'Y', 'R', 'R' ]
+] 
+ 
+board4 = [ 
+    [ '.', '.', '.', '.', '.', '.', '.' ],  # 0-9
+    [ '.', '.', '.', '.', '.', '.', '.' ],  # 10-19
+    [ '.', '.', '.', '.', '.', '.', '.' ],  # 20-29
+    [ '.', '.', '.', 'Y', 'Y', '.', '.' ],  # 30-39
+    [ '.', 'Y', 'R', 'Y', 'Y', '.', '.' ],  # 40-49
+    [ ' ', 'Y', 'Y', 'R', 'R', 'R', 'R' ]   # 50-59
+]
+
+
+def to_board(bitboard):
+    board = [ [ '.' for col in range(MAX_COL) ] for row in range(MAX_ROW) ]
+    for row in range(MAX_ROW):
+        for col in range(MAX_COL):
+            i = row * 10 + col
+            mask = 1 << i
+            for c,color in enumerate(COLORS):
+                if bitboard[c] & mask:  board[row][col] = color
+    return board
+
+
+def disp_bitboard(bitboard):
+    board = to_board(bitboard)
+    print('  ' + ''.join([str(col) for col in range(MAX_COL)]))
+    for row in range(MAX_ROW):
+        print(row, ''.join(board[row]))
+    return
+
+
+def blank_bitboard():
+    bitboard = { 0:0, 1:0 }
+    return bitboard
+
+
+def to_bitboard(board):
+    bitboard = blank_bitboard()
+    for row in range(MAX_ROW):
+        for col in range(MAX_COL):
+            i = row * 10 + col
+            mask = 1 << i
+            for c,color in enumerate(COLORS):
+                if board[row][col] == color:  bitboard[c] |= mask
+    return bitboard
+
+
+def add_piece(bitboard, c, col):
+    # find first empty row in column
+    all = bitboard[0] | bitboard[1]
+    move_mask = 1 << (((MAX_ROW - 1) * 10) + col)
+    while (move_mask and (all & move_mask)):  move_mask >>= 10
+    bitboard[c] |= move_mask
+    return move_mask
+
+
+def remove_piece(bitboard, col):
+    # find first non-empty row in column
+    mask = 1 << col
+    while (mask < (1 << (MAX_ROW * 10))):
+        for c,color in enumerate(COLORS):
+            if bitboard[c] & mask:  
+                bitboard[c] ^= mask
+                return mask
+        mask <<= 10
+    return 0
+
+
+def gen_random_bitboard(moves):
+    bitboard = blank_bitboard()
+    c = 0
+    while moves > 0:
+        # pick a random column for move
+        col = random.randint(0, MAX_COL-1)
+        move_mask = add_piece(bitboard, c, col)
+        if (move_mask):
+            # no more moves if there is a win
+            b = bitboard[c]
+            win_mask, direction = check_win_color(b)
+            if win_mask:  break
+            c = 1 if c == 0 else 0
+            moves -= 1
+    return bitboard
+
+
+def log2(z):
+    # return z.bit_length()  # slow!
+    i = -1
+    while z:
+        z >>= 1
+        i += 1
+    return i
+
+
+def check_win_color(b):
+    # check - horizontal
+    y = b & (b << 2)
+    z = (y & (y << 1)) 
+    if (z):  return z, '-'
+    # check / diagonal
+    y = b & (b << 18)
+    z = (y & (y << 9)) 
+    if (z):  return z, '/'
+    # check | vertical
+    y = b & (b << 20)
+    z = (y & (y << 10)) 
+    if (z):  return z, '|'
+    # check \ diagonal
+    y = b & (b << 22)
+    z = (y & (y << 11)) 
+    if (z):  return z, '\\'
+    return 0, None
+
+
+def check_win(bitboard):
+    for c,b in bitboard.items():
+        win_mask, direction = check_win_color(b)
+        if win_mask:  return c, win_mask, direction
+    return None, 0, None
+
+
+EVALS = 0
+def eval_bitboard(bitboard, move_mask, to_move, col):
+    col_scores = [ 1, 0, 3, 5, 3, 0, 1 ]
+    i = log2(move_mask)
+    adj_mask = (0b111 << 0) | (0b111 << 10) | (0b111 << 20)  # equiv i=11
+    try:
+        adj_mask <<= (i - 11)
+    except:
+        adj_mask >>= (11 - i)
+    adj_mask = bitboard[to_move] & adj_mask
+    adj_count = adj_mask.bit_count()
+    score = col_scores[col] + adj_count
+    global EVALS
+    EVALS = EVALS + 1
+    return score if (to_move == 0) else -score
+
+
+def recurse_moves(p_bitboard, p_to_move, p_depth):
+    # generate bitboards for each col and check for win (we do not have to eval other cols if win)
+    c_bitboards = [ None for c in range(MAX_COL) ]
+    c_move_masks = [ 0 for c in range(MAX_COL) ]
+    c_scores = [ None for c in range(MAX_COL) ]
+    cols = []
+    for col in range(MAX_COL):
+        c_bitboard = dict(p_bitboard)  # copy
+        c_move_mask = add_piece(c_bitboard, p_to_move, col)
+        if (c_move_mask):  # if valid move
+            # check for win
+            b = c_bitboard[p_to_move]
+            c_win_mask, direction = check_win_color(b)
+            if c_win_mask:
+                c_scores[col] = 100 if (p_to_move == 0) else -100  
+                return c_scores  # found win, do not need any other moves
+            # save child for recursion
+            c_bitboards[col] = c_bitboard
+            c_move_masks[col] = c_move_mask
+            cols.append(col)
+    # evaluate each move and recurse if needed
+    c_depth = p_depth + 1
+    c_to_move = 1 if p_to_move == 0 else 0
+    MAX_DEPTH = 6
+    move_count = p_bitboard[0].bit_count()
+    MAX_DEPTH += (move_count // 5)
+    for col in cols:
+        c_bitboard = c_bitboards[col]
+        # if not max depth
+        if (c_depth < MAX_DEPTH):
+            r_scores = recurse_moves(c_bitboard, c_to_move, c_depth)
+            r_scores = [ s for s in r_scores if s != None ]
+            # parent gets minmax of children
+            score = 0
+            if r_scores:
+                score = max(r_scores) if c_to_move == 0 else min(r_scores)
+            c_scores[col] = score
+            # if we found a forced winning move at depth for color to move, we can stop
+            if (p_to_move == 0):
+                if (score == 100):  break
+            elif (score == -100):  break
+        else:
+            # hit leaf (max depth) of tree
+            c_move_mask = c_move_masks[col]
+            score = eval_bitboard(c_bitboard, c_move_mask, p_to_move, col)
+            c_scores[col] = score
+    return c_scores
+
+
+
+
+boardA = [
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', 'Y', '.', 'R', '.' ],
+    [ '.', '.', 'R', 'Y', 'Y', 'R', '.' ],
+    [ '.', 'Y', 'R', 'Y', 'R', 'Y', 'R' ]
+] 
+
+boardB = [
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', '.', '.', '.', '.' ],
+    [ '.', '.', '.', 'Y', '.', '.', '.' ],
+    [ '.', '.', '.', 'R', '.', '.', '.' ]
+] 
+
+
+start_bitboard = to_bitboard(boardB)
+# start_bitboard = blank_bitboard()
+disp_bitboard(start_bitboard)
+start_time = timer()
+to_move = 0
+c_scores = recurse_moves(start_bitboard, to_move, 0)
+end_time = timer()
+print(end_time - start_time) 
+print(c_scores)
+print(EVALS)
+
+exit(-1)
+
+
+boards = [ board1, board2, board3, board4 ]
+for board in boards:
+    bitboard = to_bitboard(board)
+    disp_bitboard(bitboard)
+    win_color, win_mask, direction = check_win(bitboard)
+    if win_color:
+        print(direction, win_color, 'win at offset', log2(win_mask))
+
+
+for moves in range(40):
+    bitboard = gen_random_bitboard(moves)
+    disp_bitboard(bitboard)
+    win_color, win_mask, direction = check_win(bitboard)
+    if win_color:
+        print(direction, win_color, 'win at offset', log2(win_mask))
+
+
+# 1) winning move
+# 2) block a losing move
+# 3) move randomly (greater chance for next to same color, center, column height) as long as no lose on next piece in that column
