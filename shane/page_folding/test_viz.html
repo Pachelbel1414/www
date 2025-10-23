@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Three.js Book with Covers</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(3, 4, 5.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting for shading
+    const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    // light.position.set(4, 10, 5);
+    light.position.set(6, 8, 11);
+    scene.add(light);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambient);
+
+    const pageCount = 250;
+
+    // --- Create pages and covers ---
+    for (let i = 0; i < pageCount; i++) {
+
+      // --- Covers (first and last pages) ---
+      if (i === 0 || i === pageCount - 1) {
+        // Base rectangle shape (2x3)
+        const rectShape = new THREE.Shape();
+        rectShape.moveTo(0, 0);
+        rectShape.lineTo(2.2, 0);
+        rectShape.lineTo(2.2, 3.2);
+        rectShape.lineTo(0, 3.2);
+        rectShape.lineTo(0, 0);
+
+        const extrudeSettings = { depth: 0.06, bevelEnabled: false };
+        const coverGeometry = new THREE.ExtrudeGeometry(rectShape, extrudeSettings);
+        coverGeometry.translate(0.4, -1.6, 0);
+
+        const coverMaterial = new THREE.MeshStandardMaterial({
+          color: 0x0000CD, // med blue
+          side: THREE.DoubleSide,
+          roughness: 0.6,
+          metalness: 0.2,
+        });
+
+        const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+        cover.position.set(0, 1.5, 0);
+        cover.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
+        scene.add(cover);
+      }
+      else
+      {
+        // Dog-eared shape (5 sides)
+        const dogearShape = new THREE.Shape();
+        dogearShape.moveTo(0, 0);
+        dogearShape.lineTo(2, 0);
+        dogearShape.lineTo(2, 3 - (i * 2.0/pageCount) );   // fold start slightly below top
+        dogearShape.lineTo(2 - (i * 2.0/pageCount), 3);   // fold corner inward
+        dogearShape.lineTo(0, 3);
+        dogearShape.lineTo(0, 0);
+
+        // --- Inner pages ---
+        const shape = dogearShape;
+        const geometry = new THREE.ShapeGeometry(shape);
+        geometry.translate(0.5, -1.5, 0);
+
+        const hue = 0.1 + Math.random() * 0.05;
+        const sat = 0.15 + Math.random() * 0.25;
+        const lightness = 0.82 + Math.random() * 0.15;
+        const color = new THREE.Color().setHSL(hue, sat, lightness);
+
+        const material = new THREE.MeshStandardMaterial({
+          color: color,
+          side: THREE.DoubleSide,
+          roughness: 0.8,
+          metalness: 0.0,
+        });
+
+        const page = new THREE.Mesh(geometry, material);
+        page.position.set(0, 1.5, 0);
+        page.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
+        scene.add(page);
+      }
+    }
+
+    const grid = new THREE.GridHelper(10, 10);
+    scene.add(grid);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
