@@ -58,7 +58,7 @@
     grainyTexture.repeat.set(8, 8);  // how dense the grain appears
 
 
-    const pageCount = 250;
+    const pageCount = 150;
 
     // --- Create pages and covers ---
     for (let i = 0; i < pageCount; i++) {
@@ -68,9 +68,9 @@
         // Base rectangle shape (2x3)
         const rectShape = new THREE.Shape();
         rectShape.moveTo(0, 0);
-        rectShape.lineTo(2.2, 0);
-        rectShape.lineTo(2.2, 3.2);
-        rectShape.lineTo(0, 3.2);
+        rectShape.lineTo(2.05, 0);
+        rectShape.lineTo(2.05, 3.1);
+        rectShape.lineTo(0, 3.1);
         rectShape.lineTo(0, 0);
 
         const extrudeSettings = {
@@ -81,7 +81,7 @@
           bevelSegments: 2,
         };
         const coverGeometry = new THREE.ExtrudeGeometry(rectShape, extrudeSettings);
-        coverGeometry.translate(0.4, -1.6, 0);
+        coverGeometry.translate(0.5, -1.55, 0);
 
         const leatherMaterial = new THREE.MeshStandardMaterial({
           // side: THREE.DoubleSide,  // no grain
@@ -102,24 +102,29 @@
         const dogearShape = new THREE.Shape();
         dogearShape.moveTo(0, 0);
         dogearShape.lineTo(2, 0);
-        dogearShape.lineTo(2, 3 - (i * 2.0/pageCount) );   // fold start slightly below top
-        dogearShape.lineTo(2 - (i * 2.0/pageCount), 3);   // fold corner inward
+        if (i < pageCount / 2) {
+          dogearShape.lineTo(2, 2 + (i * 1.0/pageCount) );   // fold start slightly below top
+          dogearShape.lineTo(1 + (i * 1.0/pageCount), 3);   // fold corner inward
+        } else {
+          dogearShape.lineTo(2, 2 + ((pageCount - i) * 1.0/pageCount) );   // fold start slightly below top
+          dogearShape.lineTo(1 + ((pageCount - i) * 1.0/pageCount), 3);   // fold corner inward
+        }
         dogearShape.lineTo(0, 3);
         dogearShape.lineTo(0, 0);
 
         // slight page thickness
         const extrudeSettings = {
-          depth: 0.001,
+          depth: 0.005,
           bevelEnabled: false
         };
         // for now, go with simple shape
-        // const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, extrudeSettings);
-        const pageGeometry = new THREE.ShapeGeometry(dogearShape);
+        const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, extrudeSettings);
+        //const pageGeometry = new THREE.ShapeGeometry(dogearShape);
         pageGeometry.translate(0.5, -1.5, 0);
 
         const hue = 0.1 + Math.random() * 0.05;
         const sat = 0.15 + Math.random() * 0.25;
-        const lightness = 0.82 + Math.random() * 0.15;
+        const lightness = 0.65 + Math.random() * 0.15;
         const color = new THREE.Color().setHSL(hue, sat, lightness);
 
         const material = new THREE.MeshStandardMaterial({
