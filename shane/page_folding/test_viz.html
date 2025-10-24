@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Test Viz of Book with Covers</title>
+  <title>Book Cover Inset Upload Demo</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
@@ -13,149 +13,220 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
   <script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(3, 4, 5.5);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(3, 4, 5.5);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
 
-    // Lighting for shading
-    const light = new THREE.DirectionalLight(0xffffff, 0.8);
-    // light.position.set(4, 10, 5);
-    light.position.set(6, 8, 11);
-    scene.add(light);
+  // Lighting
+  const light = new THREE.DirectionalLight(0xffffff, 0.8);
+  light.position.set(6, 8, 11);
+  scene.add(light);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+  scene.add(ambient);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambient);
-
-    // create a grainy texture
+  // --- Procedural grain texture (leather) ---
+  function makeGrainTexture() {
     const size = 256;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
-
-    // Draw simple noise for a grainy look
     const imageData = ctx.createImageData(size, size);
     for (let i = 0; i < imageData.data.length; i += 4) {
       const val = 100 + Math.random() * 40;
-      imageData.data[i] = val;     // R
-      imageData.data[i + 1] = val; // G
-      imageData.data[i + 2] = val; // B
-      imageData.data[i + 3] = 255; // A
+      imageData.data[i] = val;
+      imageData.data[i + 1] = val;
+      imageData.data[i + 2] = val;
+      imageData.data[i + 3] = 255;
     }
     ctx.putImageData(imageData, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(8, 8);
+    return texture;
+  }
 
-    const grainyTexture = new THREE.CanvasTexture(canvas);
-    grainyTexture.wrapS = grainyTexture.wrapT = THREE.RepeatWrapping;
-    grainyTexture.repeat.set(8, 8);  // how dense the grain appears
+  const grainyTexture = makeGrainTexture();
+  const leatherMaterial = new THREE.MeshStandardMaterial({
+    map: grainyTexture,
+    roughness: 0.8,
+    metalness: 0.1,
+    color: 0x236842,
+  });
 
+  // --- File input for inset image ---
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.position = 'fixed';
+  input.style.top = '10px';
+  input.style.left = '10px';
+  input.style.zIndex = '10';
+  document.body.appendChild(input);
 
-    const pageCount = 150;
+  let insetMesh = null;
+  const loader = new THREE.TextureLoader();
 
-    // --- Create pages and covers ---
-    for (let i = 0; i < pageCount; i++) {
+  function makeColorTransparent(image, keyColor = { r: 0, g: 255, b: 0 }, tolerance = 40) {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0);
 
-      // --- Covers (first and last pages) ---
-      if (i === 0 || i === pageCount - 1) {
-        // Base rectangle shape (2x3)
-        const rectShape = new THREE.Shape();
-        rectShape.moveTo(0, 0);
-        rectShape.lineTo(2.05, 0);
-        rectShape.lineTo(2.05, 3.1);
-        rectShape.lineTo(0, 3.1);
-        rectShape.lineTo(0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
 
-        const extrudeSettings = {
-          depth: 0.06,
-          bevelEnabled: true,
-          bevelThickness: 0.02,
-          bevelSize: 0.02,
-          bevelSegments: 2,
-        };
-        const coverGeometry = new THREE.ExtrudeGeometry(rectShape, extrudeSettings);
-        coverGeometry.translate(0.5, -1.55, 0);
+    for (let i = 0; i < data.length; i += 4) {
+      const dr = data[i] - keyColor.r;
+      const dg = data[i + 1] - keyColor.g;
+      const db = data[i + 2] - keyColor.b;
+      const dist = Math.sqrt(dr * dr + dg * dg + db * db);
 
-        const leatherMaterial = new THREE.MeshStandardMaterial({
-          // side: THREE.DoubleSide,  // no grain
-          map: grainyTexture,
-          roughness: 0.8,
-          metalness: 0.1,
-          color: 0x236842,  // medium dark green
-        });
-
-        const cover = new THREE.Mesh(coverGeometry, leatherMaterial);
-        cover.position.set(0, 1.5, 0);
-        cover.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
-        scene.add(cover);
-      }
-      else
-      {
-        // Dog-eared shape (5 sides)
-        const dogearShape = new THREE.Shape();
-        dogearShape.moveTo(0, 0);
-        dogearShape.lineTo(2, 0);
-        if (i < pageCount / 2) {
-          dogearShape.lineTo(2, 2 + (i * 1.0/pageCount) );   // fold start slightly below top
-          dogearShape.lineTo(1 + (i * 1.0/pageCount), 3);   // fold corner inward
-        } else {
-          dogearShape.lineTo(2, 2 + ((pageCount - i) * 1.0/pageCount) );   // fold start slightly below top
-          dogearShape.lineTo(1 + ((pageCount - i) * 1.0/pageCount), 3);   // fold corner inward
-        }
-        dogearShape.lineTo(0, 3);
-        dogearShape.lineTo(0, 0);
-
-        // slight page thickness
-        const extrudeSettings = {
-          depth: 0.005,
-          bevelEnabled: false
-        };
-        // for now, go with simple shape
-        const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, extrudeSettings);
-        //const pageGeometry = new THREE.ShapeGeometry(dogearShape);
-        pageGeometry.translate(0.5, -1.5, 0);
-
-        const hue = 0.1 + Math.random() * 0.05;
-        const sat = 0.15 + Math.random() * 0.25;
-        const lightness = 0.65 + Math.random() * 0.15;
-        const color = new THREE.Color().setHSL(hue, sat, lightness);
-
-        const material = new THREE.MeshStandardMaterial({
-          color: color,
-          side: THREE.DoubleSide,
-          roughness: 0.8,
-          metalness: 0.0,
-        });
-
-        const page = new THREE.Mesh(pageGeometry, material);
-        page.position.set(0, 1.5, 0);
-        page.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
-        scene.add(page);
-      }
+      if (dist < tolerance) data[i + 3] = 0; // make transparent
     }
 
-    const grid = new THREE.GridHelper(10, 10);
-    scene.add(grid);
+    ctx.putImageData(imgData, 0, 0);
+    return new THREE.CanvasTexture(canvas);
+  }
 
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+    const url = URL.createObjectURL(file);
+    loader.load(url, (texture) => {
+      if (insetMesh) scene.remove(insetMesh);
+
+      const image = texture.image;
+      const transparentTex = makeColorTransparent(image, { r: 255, g: 255, b: 255 }, 10); // white transparent
+ 
+      const aspect = transparentTex.image.width / transparentTex.image.height;
+      const insetWidth = 1.4;
+      const insetHeight = insetWidth / aspect;
+
+      const insetGeometry = new THREE.PlaneGeometry(insetWidth, insetHeight);
+const insetMaterial = new THREE.MeshStandardMaterial({
+  map: transparentTex,
+  transparent: true,
+  alphaTest: 0.5,
+  color: 0xF6D97E,        // subtle lift from F2D46F → brighter yellow-gold
+  metalness: 1.0,
+  roughness: 0.1,         // small tweak = sharper shine
+  emissive: 0x8A6C10,     // soft warm gold-brown glow
+  emissiveIntensity: 0.5, // a hair stronger
+  envMapIntensity: 2.0,
+  side: THREE.DoubleSide,
+});
+
+      insetMesh = new THREE.Mesh(insetGeometry, insetMaterial);
+      insetMesh.position.set(-0.09, 1.45, 1.5);
+      insetMesh.rotation.y = -Math.PI / 2;
+      scene.add(insetMesh);
+
+      URL.revokeObjectURL(url);
     });
+  });
+
+  // --- Book construction ---
+  const pageCount = 250;
+
+  for (let i = 0; i < pageCount; i++) {
+    if (i === 0 || i === pageCount - 1) {
+      const coverShape = new THREE.Shape();
+      coverShape.moveTo(0, 0);
+      coverShape.lineTo(2.05, 0);
+      coverShape.lineTo(2.05, 3.1);
+      coverShape.lineTo(0, 3.1);
+      coverShape.lineTo(0, 0);
+
+      const extrudeSettings = {
+        depth: 0.06,
+        bevelEnabled: true,
+        bevelThickness: 0.02,
+        bevelSize: 0.02,
+        bevelSegments: 2,
+      };
+      const coverGeometry = new THREE.ExtrudeGeometry(coverShape, extrudeSettings);
+      coverGeometry.translate(0.5, -0.05, 0);
+
+      if (i === 0) {
+        const spineShape = new THREE.Shape();
+        spineShape.moveTo(0, 0);
+        spineShape.lineTo(0.45, 0);
+        spineShape.lineTo(0.45, 3.1);
+        spineShape.lineTo(0, 3.1);
+        spineShape.lineTo(0, 0);
+
+        const spineGeometry = new THREE.ExtrudeGeometry(spineShape, extrudeSettings);
+        const spine = new THREE.Mesh(spineGeometry, leatherMaterial);
+        spine.position.set(0, -0.05, 0.5);
+        spine.rotation.y = (25 * Math.PI / 180);
+        scene.add(spine);
+      }
+
+      const cover = new THREE.Mesh(coverGeometry, leatherMaterial);
+      cover.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
+      scene.add(cover);
+    } else {
+      const dogearShape = new THREE.Shape();
+      dogearShape.moveTo(0, 0);
+      dogearShape.lineTo(2, 0);
+      if (i < pageCount / 2) {
+        dogearShape.lineTo(2, 2 + (i * 1.0 / pageCount));
+        dogearShape.lineTo(1 + (i * 1.0 / pageCount), 3);
+      } else {
+        dogearShape.lineTo(2, 2 + ((pageCount - i) * 1.0 / pageCount));
+        dogearShape.lineTo(1 + ((pageCount - i) * 1.0 / pageCount), 3);
+      }
+      dogearShape.lineTo(0, 3);
+      dogearShape.lineTo(0, 0);
+
+      const extrudeSettings = { depth: 0.005, bevelEnabled: false };
+      const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, extrudeSettings);
+      pageGeometry.translate(0.5, 0, 0);
+
+      const hue = 0.1 + Math.random() * 0.05;
+      const sat = 0.15 + Math.random() * 0.25;
+      const lightness = 0.65 + Math.random() * 0.15;
+      const color = new THREE.Color().setHSL(hue, sat, lightness);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: color,
+        side: THREE.DoubleSide,
+        roughness: 0.8,
+        metalness: 0.0,
+      });
+
+      const page = new THREE.Mesh(pageGeometry, material);
+      page.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
+      scene.add(page);
+    }
+  }
+
+  const grid = new THREE.GridHelper(10, 10);
+  scene.add(grid);
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
   </script>
 </body>
 </html>
