@@ -21,7 +21,7 @@
 
   // Lighting
   const light = new THREE.DirectionalLight(0xffffff, 0.8);
-  light.position.set(6, 0, 8);  // 6 8 11
+  light.position.set(6, 8, 11);
   scene.add(light);
   const ambient = new THREE.AmbientLight(0xffffff, 0.8);
   scene.add(ambient);
@@ -67,7 +67,7 @@
 
 
   // Page texture/material
-  const pageExtrudeSettings = { depth: 0.005, bevelEnabled: false };
+  const pageExtrudeSettings = { depth: 0.008, bevelEnabled: false };
 
 
   // some scene elements
@@ -173,7 +173,7 @@
 
   // fold1 - distance from top edge
   // fold2 - distance from bottom edge
-  function makePage(fold1, fold2) {
+  function makePage_orig(fold1, fold2) {
     if ((fold1 + fold2) > 3)  fold1 = fold2 = (fold1 + fold2) / 2.0;
 
     const dogearShape = new THREE.Shape();
@@ -186,7 +186,7 @@
     dogearShape.lineTo(0, 0);
 
     const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, pageExtrudeSettings);
-    // slight ranom variations in x,y
+    // slight random variations in x,y
     pageGeometry.translate(0.5 + Math.random() * 0.012, Math.random() * 0.012, 0);
 
     // slight random color variations for the page
@@ -204,6 +204,61 @@
 
     const page = new THREE.Mesh(pageGeometry, pageMaterial);
     return page
+  }
+
+
+  function makePage(fold1, fold2) {
+    if ((fold1 + fold2) > 3)  fold1 = fold2 = (fold1 + fold2) / 2.0;
+
+    const dogearShape = new THREE.Shape();
+    dogearShape.moveTo(0, 0);
+    dogearShape.lineTo(Math.max(2 - fold2, 0), 0);  // 2,0 if no bottom fold
+    dogearShape.lineTo(2, fold2);                   // 2,0 if no bottom fold
+    dogearShape.lineTo(2, Math.max(3 - fold1, 0));  // 2,3 if no top fold
+    dogearShape.lineTo(Math.max(2 - fold1, 0), 3);  // 2,3 if no top fold
+    dogearShape.lineTo(0, 3);
+    dogearShape.lineTo(0, 0);
+
+    var pageGeometry = new THREE.ExtrudeGeometry(dogearShape, pageExtrudeSettings);
+    // slight random variations in x,y
+    pageGeometry.translate(0.5 + Math.random() * 0.012, Math.random() * 0.012, 0);
+
+    // base paper color
+    var hue = 0.1 + Math.random() * 0.05;
+    var sat = 0.15 + Math.random() * 0.25;
+    var light = 0.85 + Math.random() * 0.15;
+    var baseColor = new THREE.Color().setHSL(hue, sat, light);
+    var edgeColor = baseColor.clone().multiplyScalar(0.6);  // darker
+
+    var pageMaterial = new THREE.MeshStandardMaterial({
+      color: baseColor,
+      roughness: 0.8,
+      metalness: 0.0,
+      vertexColors: true
+    });
+
+    var pos = pageGeometry.attributes.position;
+    var colorArray = new Float32Array(pos.count * 3);
+
+    // color per vertex: darken if on outer edge (x near max)
+    var maxX = -Infinity;
+    for (var i = 0; i < pos.count; i++) {
+      maxX = Math.max(maxX, pos.getX(i));
+    }
+
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i);
+      var c = (x > maxX - 0.001) ? edgeColor : baseColor;
+      colorArray[i * 3]     = c.r;
+      colorArray[i * 3 + 1] = c.g;
+      colorArray[i * 3 + 2] = c.b;
+    }
+
+    pageGeometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+
+    const page = new THREE.Mesh(pageGeometry, pageMaterial);
+    return page
+
   }
 
 
