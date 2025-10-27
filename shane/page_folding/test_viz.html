@@ -14,25 +14,19 @@
 
   <script>
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(3, 4, 5.5);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-
   // Lighting
   const light = new THREE.DirectionalLight(0xffffff, 0.8);
-  light.position.set(6, 8, 11);
+  light.position.set(6, 0, 8);  // 6 8 11
   scene.add(light);
   const ambient = new THREE.AmbientLight(0xffffff, 0.8);
   scene.add(ambient);
 
-  // --- Procedural grain texture (leather) ---
+  // Cover texture/material
   function makeGrainTexture() {
     const size = 256;
     const canvas = document.createElement('canvas');
@@ -55,12 +49,26 @@
   }
 
   const grainyTexture = makeGrainTexture();
+
   const leatherMaterial = new THREE.MeshStandardMaterial({
     map: grainyTexture,
     roughness: 0.8,
     metalness: 0.1,
     color: 0x236842,
   });
+
+  const coverExtrudeSettings = {
+    depth: 0.06,
+    bevelEnabled: true,
+    bevelThickness: 0.02,
+    bevelSize: 0.02,
+    bevelSegments: 2,
+  };
+
+
+  // Page texture/material
+  const pageExtrudeSettings = { depth: 0.005, bevelEnabled: false };
+
 
   // --- File input for inset image ---
   const input = document.createElement('input');
@@ -72,151 +80,316 @@
   input.style.zIndex = '10';
   document.body.appendChild(input);
 
-  let insetMesh = null;
-  const loader = new THREE.TextureLoader();
+  // some scene elements
+  var pageCount = 250;
+  var pages = new Array(pageCount).fill(null)
 
-  function makeColorTransparent(image, keyColor = { r: 0, g: 255, b: 0 }, tolerance = 40) {
+
+  // Convert to single-color alpha mask (transparency indicates off/on)
+  // Also returns per-column run data: [{ start, end }, ...] for each column
+  function makeColorTransparent(image, keyColor = { r: 255, g: 255, b: 255 }, tolerance = 40) {
     const canvas = document.createElement('canvas');
     canvas.width = image.width;
     canvas.height = image.height;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(image, 0, 0);
 
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
+    const { width, height } = canvas;
+    const srcData = ctx.getImageData(0, 0, width, height).data;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const dr = data[i] - keyColor.r;
-      const dg = data[i + 1] - keyColor.g;
-      const db = data[i + 2] - keyColor.b;
-      const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+    const dstData = new Uint8ClampedArray(width * height * 4); // auto zeroed
+    const columnRuns = new Array(width).fill(null).map(() => []); // array of arrays
+    const tol2 = tolerance * tolerance;
+    const minRunLength = 8;
 
-      if (dist < tolerance) data[i + 3] = 0; // make transparent
+    for (let x = 0; x < width; x++) {
+      let runStart = -1;
+      let runLength = 0;
+
+      for (let y = 0; y < height; y++) {
+        const i = (y * width + x) * 4;
+        const dr = srcData[i] - keyColor.r;
+        const dg = srcData[i + 1] - keyColor.g;
+        const db = srcData[i + 2] - keyColor.b;
+        const dist2 = dr * dr + dg * dg + db * db;
+
+        if (dist2 > tol2) {
+          dstData[i + 3] = 255;
+
+          if (runStart == -1) runStart = y;
+          runLength++;
+        } else {
+          if (runStart != -1 && runLength >= minRunLength) {
+            columnRuns[x].push({ start: runStart, end: y - 1 });
+          }
+          runStart = -1;
+          runLength = 0;
+        }
+      }
+
+      // handle case where run reaches bottom of image
+      if (runStart != -1 && runLength >= minRunLength) {
+        columnRuns[x].push({ start: runStart, end: height - 1 });
+      }
     }
 
+    const imgData = new ImageData(dstData, width, height);
     ctx.putImageData(imgData, 0, 0);
-    return new THREE.CanvasTexture(canvas);
+
+    const insetTex = new THREE.CanvasTexture(canvas);
+    insetTex.generateMipmaps = false;
+    insetTex.minFilter = THREE.NearestFilter;
+    insetTex.magFilter = THREE.NearestFilter;
+    insetTex.premultiplyAlpha = false;
+    insetTex.needsUpdate = true;
+
+    return { insetTex, columnRuns };
   }
 
+
+  function makeSpine() {
+    const spineShape = new THREE.Shape();
+    spineShape.moveTo(0, 0);
+    spineShape.lineTo(0.45, 0);
+    spineShape.lineTo(0.45, 3.1);
+    spineShape.lineTo(0, 3.1);
+    spineShape.lineTo(0, 0);
+
+    const spineGeometry = new THREE.ExtrudeGeometry(spineShape, coverExtrudeSettings);
+    const spine = new THREE.Mesh(spineGeometry, leatherMaterial);
+    spine.position.set(0, -0.05, 0.5);
+    spine.rotation.y = (25 * Math.PI / 180);
+    return spine;
+  }
+
+
+  function makeCover(isBack) {
+    const coverShape = new THREE.Shape();
+    coverShape.moveTo(0, 0);
+    coverShape.lineTo(2.05, 0);
+    coverShape.lineTo(2.05, 3.1);
+    coverShape.lineTo(0, 3.1);
+    coverShape.lineTo(0, 0);
+
+    const coverGeometry = new THREE.ExtrudeGeometry(coverShape, coverExtrudeSettings);
+    coverGeometry.translate(0.5, -0.05, 0);
+
+    const cover = new THREE.Mesh(coverGeometry, leatherMaterial);
+    let offset = isBack ?  pageCount + 12 : 0;
+    cover.rotation.y = (-90 * Math.PI / 180) + offset * (1.0 / pageCount);
+    return cover;
+  }
+
+
+  // fold1 - distance from top edge
+  // fold2 - distance from bottom edge
+  function makePage(fold1, fold2) {
+    if ((fold1 + fold2) > 3)  fold1 = fold2 = (fold1 + fold2) / 2.0;
+
+    const dogearShape = new THREE.Shape();
+    dogearShape.moveTo(0, 0);
+    dogearShape.lineTo(Math.max(2 - fold2, 0), 0);  // 2,0 if no bottom fold
+    dogearShape.lineTo(2, fold2);                   // 2,0 if no bottom fold
+    dogearShape.lineTo(2, Math.max(3 - fold1, 0));  // 2,3 if no top fold
+    dogearShape.lineTo(Math.max(2 - fold1, 0), 3);  // 2,3 if no top fold
+    dogearShape.lineTo(0, 3);
+    dogearShape.lineTo(0, 0);
+
+    const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, pageExtrudeSettings);
+    // slight ranom variations in x,y
+    pageGeometry.translate(0.5 + Math.random() * 0.012, Math.random() * 0.012, 0);
+
+    // slight random color variations for the page
+    const hue = 0.1 + Math.random() * 0.05;
+    const sat = 0.15 + Math.random() * 0.25;
+    const lightness = 0.65 + Math.random() * 0.15;
+    const color = new THREE.Color().setHSL(hue, sat, lightness);
+
+    const pageMaterial = new THREE.MeshStandardMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+      roughness: 0.8,
+      metalness: 0.0,
+    });
+
+    const page = new THREE.Mesh(pageGeometry, pageMaterial);
+    return page
+  }
+
+
+  // --- Book construction ---
+  // imageData - canvas image
+  function makeBook(scene, pageCount, imageData, columnRuns) {
+
+    //console.log('makeBook', 'imageData', imageData, 'columnRuns', columnRuns)
+
+    // remove old scene pages
+    for (const page of pages)
+      if (page)
+        scene.remove(page);
+    pages.length = 0
+
+    // tbd ksh !!! these are going to stack up, remove old?
+    const spine = makeSpine();
+    scene.add(spine);
+
+    const frontCover = makeCover(false);  // front cover
+    scene.add(frontCover);
+
+    const backCover = makeCover(true);  // back cover
+    scene.add(backCover);
+
+    var scenePage = 0;
+
+    // if no image data, create plain pages
+    if (!imageData || !columnRuns) {
+
+      for (let i = 0; i < pageCount; i++) {
+          pages[i] = makePage(0, 0);  // page without folds
+      }
+      scenePage = pageCount;
+
+    } else {
+
+      const { width, height } = imageData
+
+      // find the column with the most runs
+      // each "page" will need to be this many pages
+      var longestLength = 0;
+      for (var i = 0; i < columnRuns.length; i++) {
+        if (columnRuns[i].length > longestLength) {
+          longestLength = columnRuns[i].length;
+        }
+      }
+
+      // generate at least 1 page for each column index
+      for (let columnIndex = 0; (columnIndex < columnRuns.length); columnIndex++) {
+
+        // since we are not "cutting", there needs to be a page for each run
+        numRuns = columnRuns[columnIndex].length;
+
+        // if no runs in column
+        if (numRuns < 1) {
+
+          for (let l=0; l<longestLength; l++) {
+            // should be page folded in half from side (no corner folds)
+            // but for now...
+            pages[scenePage] = makePage(1.5, 1.5); 
+            pages[scenePage].rotation.y = (-90 * Math.PI / 180) + (scenePage + 4) * (1.0 / pageCount);
+            scenePage++;
+          }
+
+        } else {
+
+          // extra page
+          extraPages = longestLength - numRuns;
+          incPage = Math.floor(longestLength / numRuns);  // zero case handled above
+
+          // generate a folded page for each run in the column
+          for (const { start, end } of columnRuns[columnIndex]) {
+
+            let fold1 = start > 0 ? start / height * 3.0 : 0;
+            let fold2 = end > 0 ? 3.0 - end / height * 3.0 : 0;
+            //console.log(columnIndex, 'w/h', width, height, 's/e', start, end, 'folds', fold1, fold2)
+
+            pages[scenePage] = makePage(fold1, fold2);
+            pages[scenePage].rotation.y = (-90 * Math.PI / 180) + (scenePage + 4) * (1.0 / pageCount);
+            scenePage++;
+
+            for (let j=0; j<incPage; j++) {
+              if (extraPages < 1)  break;
+              pages[scenePage] = makePage(fold1, fold2);
+              pages[scenePage].rotation.y = (-90 * Math.PI / 180) + (scenePage + 4) * (1.0 / pageCount);
+              scenePage++;
+              extraPages--;
+            }
+
+            //if (scenePage >= pageCount)  break;
+            //break;  // debug
+          }
+
+        }
+
+      }
+
+    }
+
+    // now that we know how many pages we generated... spread them out evenly
+    for (let i = 0; i < scenePage; i++) {
+        page = pages[i]
+        page.rotation.y = (-90 * Math.PI / 180) + (i + 4) * (1.0 / scenePage);
+        scene.add(page);
+    }
+
+  }
+
+
+  // texture loader for the inset image
+  const loader = new THREE.TextureLoader();
+  var insetMesh = null;
+
+  // button handler for when an inset image is selected
   input.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const url = URL.createObjectURL(file);
     loader.load(url, (texture) => {
+      // remove any old inset
       if (insetMesh) scene.remove(insetMesh);
 
       const image = texture.image;
-      const transparentTex = makeColorTransparent(image, { r: 255, g: 255, b: 255 }, 10); // white transparent
- 
-      const aspect = transparentTex.image.width / transparentTex.image.height;
+      var { insetTex, columnRuns } = makeColorTransparent(image, { r: 255, g: 255, b: 255 }, 10);
+      //console.log('insetTex', insetTex, 'columnRuns', columnRuns)
+      
+      const aspect = insetTex.image.width / insetTex.image.height;
       const insetWidth = 1.4;
       const insetHeight = insetWidth / aspect;
 
       const insetGeometry = new THREE.PlaneGeometry(insetWidth, insetHeight);
-const insetMaterial = new THREE.MeshStandardMaterial({
-  map: transparentTex,
-  transparent: true,
-  alphaTest: 0.5,
-  color: 0xF6D97E,        // subtle lift from F2D46F → brighter yellow-gold
-  metalness: 1.0,
-  roughness: 0.1,         // small tweak = sharper shine
-  emissive: 0x8A6C10,     // soft warm gold-brown glow
-  emissiveIntensity: 0.5, // a hair stronger
-  envMapIntensity: 2.0,
-  side: THREE.DoubleSide,
-});
+      const insetMaterial = new THREE.MeshStandardMaterial({
+        map: insetTex,
+        transparent: true,
+        alphaTest: 0.5,
+        color: 0xF6D97E,        // brighter yellow-gold
+        metalness: 1.0,
+        roughness: 0.1,         // sharper shine
+        emissive: 0x8A6C10,     // soft warm gold-brown glow
+        emissiveIntensity: 0.5,
+        envMapIntensity: 2.0,
+        side: THREE.DoubleSide,
+      });
 
       insetMesh = new THREE.Mesh(insetGeometry, insetMaterial);
       insetMesh.position.set(-0.09, 1.45, 1.5);
       insetMesh.rotation.y = -Math.PI / 2;
       scene.add(insetMesh);
 
+      // remake book with (new) inset
+      makeBook(scene, pageCount, insetTex.image, columnRuns)
+
       URL.revokeObjectURL(url);
     });
   });
 
-  // --- Book construction ---
-  const pageCount = 250;
 
-  for (let i = 0; i < pageCount; i++) {
-    if (i === 0 || i === pageCount - 1) {
-      const coverShape = new THREE.Shape();
-      coverShape.moveTo(0, 0);
-      coverShape.lineTo(2.05, 0);
-      coverShape.lineTo(2.05, 3.1);
-      coverShape.lineTo(0, 3.1);
-      coverShape.lineTo(0, 0);
+  // make the initial book
+  makeBook(scene, pageCount, null, null)
 
-      const extrudeSettings = {
-        depth: 0.06,
-        bevelEnabled: true,
-        bevelThickness: 0.02,
-        bevelSize: 0.02,
-        bevelSegments: 2,
-      };
-      const coverGeometry = new THREE.ExtrudeGeometry(coverShape, extrudeSettings);
-      coverGeometry.translate(0.5, -0.05, 0);
-
-      if (i === 0) {
-        const spineShape = new THREE.Shape();
-        spineShape.moveTo(0, 0);
-        spineShape.lineTo(0.45, 0);
-        spineShape.lineTo(0.45, 3.1);
-        spineShape.lineTo(0, 3.1);
-        spineShape.lineTo(0, 0);
-
-        const spineGeometry = new THREE.ExtrudeGeometry(spineShape, extrudeSettings);
-        const spine = new THREE.Mesh(spineGeometry, leatherMaterial);
-        spine.position.set(0, -0.05, 0.5);
-        spine.rotation.y = (25 * Math.PI / 180);
-        scene.add(spine);
-      }
-
-      const cover = new THREE.Mesh(coverGeometry, leatherMaterial);
-      cover.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
-      scene.add(cover);
-    } else {
-      const dogearShape = new THREE.Shape();
-      dogearShape.moveTo(0, 0);
-      dogearShape.lineTo(2, 0);
-      if (i < pageCount / 2) {
-        dogearShape.lineTo(2, 2 + (i * 1.0 / pageCount));
-        dogearShape.lineTo(1 + (i * 1.0 / pageCount), 3);
-      } else {
-        dogearShape.lineTo(2, 2 + ((pageCount - i) * 1.0 / pageCount));
-        dogearShape.lineTo(1 + ((pageCount - i) * 1.0 / pageCount), 3);
-      }
-      dogearShape.lineTo(0, 3);
-      dogearShape.lineTo(0, 0);
-
-      const extrudeSettings = { depth: 0.005, bevelEnabled: false };
-      const pageGeometry = new THREE.ExtrudeGeometry(dogearShape, extrudeSettings);
-      pageGeometry.translate(0.5, 0, 0);
-
-      const hue = 0.1 + Math.random() * 0.05;
-      const sat = 0.15 + Math.random() * 0.25;
-      const lightness = 0.65 + Math.random() * 0.15;
-      const color = new THREE.Color().setHSL(hue, sat, lightness);
-
-      const material = new THREE.MeshStandardMaterial({
-        color: color,
-        side: THREE.DoubleSide,
-        roughness: 0.8,
-        metalness: 0.0,
-      });
-
-      const page = new THREE.Mesh(pageGeometry, material);
-      page.rotation.y = (-90 * Math.PI / 180) + i * (1.0 / pageCount);
-      scene.add(page);
-    }
-  }
-
+  // add a grid to help with the view visualization
   const grid = new THREE.GridHelper(10, 10);
   scene.add(grid);
 
+  // add view controls
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(3, 4, 5.5);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+
   function animate() {
-    requestAnimationFrame(animate);
+    requestAnimationFrame(animate);  // recursive
     controls.update();
     renderer.render(scene, camera);
   }
@@ -227,6 +400,7 @@ const insetMaterial = new THREE.MeshStandardMaterial({
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
   </script>
 </body>
 </html>
