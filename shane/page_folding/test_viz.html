@@ -70,16 +70,6 @@
   const pageExtrudeSettings = { depth: 0.005, bevelEnabled: false };
 
 
-  // --- File input for inset image ---
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.style.position = 'fixed';
-  input.style.top = '10px';
-  input.style.left = '10px';
-  input.style.zIndex = '10';
-  document.body.appendChild(input);
-
   // some scene elements
   var pageCount = 250;
   var pages = new Array(pageCount).fill(null)
@@ -324,21 +314,11 @@
   }
 
 
-  // texture loader for the inset image
-  const loader = new THREE.TextureLoader();
-  var insetMesh = null;
-
-  // button handler for when an inset image is selected
-  input.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
-    loader.load(url, (texture) => {
+  // note this regenerates the entire book
+  function applyInset(image) {
       // remove any old inset
       if (insetMesh) scene.remove(insetMesh);
 
-      const image = texture.image;
       var { insetTex, columnRuns } = makeColorTransparent(image, { r: 255, g: 255, b: 255 }, 10);
       //console.log('insetTex', insetTex, 'columnRuns', columnRuns)
       
@@ -367,6 +347,50 @@
 
       // remake book with (new) inset
       makeBook(scene, pageCount, insetTex.image, columnRuns)
+  }
+
+
+  // --- File input for inset image ---
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.position = 'fixed';
+  input.style.top = '10px';
+  input.style.left = '10px';
+  input.style.zIndex = '10';
+  document.body.appendChild(input);
+
+  // --- Visible button for fixed input ---
+  var button = document.createElement('button');
+  button.textContent = 'Load ASL K';
+  button.style.position = 'fixed';
+  button.style.top = '40px';
+  button.style.left = '10px';
+  button.style.zIndex = '10';
+  document.body.appendChild(button);
+
+  // texture loader for the inset image
+  const loader = new THREE.TextureLoader();
+  var insetMesh = null;
+
+  // --- Example action for button ---
+  button.onclick = function() {
+    loader.load('k_cut_min_2.bmp', function(texture) {
+      var image = texture.image;
+      applyInset(image);
+    });
+  }
+
+  // button handler for when an inset image is selected
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    loader.load(url, (texture) => {
+
+      const image = texture.image;
+      applyInset(image) 
 
       URL.revokeObjectURL(url);
     });
