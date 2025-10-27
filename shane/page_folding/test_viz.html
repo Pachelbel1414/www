@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Book Cover Inset Upload Demo</title>
   <style>
     body { margin: 0; overflow: hidden; }
@@ -405,31 +406,56 @@
   }
 
 
-  // --- File input for inset image ---
-  const input = document.createElement('input');
+  // --- Hidden file input ---
+  var input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.style.position = 'fixed';
-  input.style.top = '10px';
-  input.style.left = '10px';
-  input.style.zIndex = '10';
+  input.style.display = 'none'; // hide the native control
   document.body.appendChild(input);
 
-  // --- Visible button for fixed input ---
-  var button = document.createElement('button');
-  button.textContent = 'Load ASL K';
-  button.style.position = 'fixed';
-  button.style.top = '40px';
-  button.style.left = '10px';
-  button.style.zIndex = '10';
-  document.body.appendChild(button);
+  // --- Shared style function ---
+  function styleControl(el) {
+    el.style.display = 'inline-block';
+    el.style.boxSizing = 'border-box';
+    el.style.width = '140px';
+    el.style.height = '48px';
+    el.style.fontSize = '16px';
+    el.style.padding = '10px 20px';
+    el.style.borderRadius = '6px';
+    el.style.border = '1px solid #888';
+    el.style.background = '#f5f5f5';
+    el.style.color = '#000';
+    el.style.cursor = 'pointer';
+    el.style.zIndex = '10';
+    el.style.position = 'fixed';
+    el.style.left = '10px';
+  }
+
+  // --- Button to trigger file selection ---
+  var fileButton = document.createElement('button');
+  fileButton.textContent = 'Select Image';
+  styleControl(fileButton);
+  fileButton.style.top = '10px';
+  document.body.appendChild(fileButton);
+
+  // --- "Load ASL K" button ---
+  var loadButton = document.createElement('button');
+  loadButton.textContent = 'Load ASL K';
+  styleControl(loadButton);
+  loadButton.style.top = '70px';
+  document.body.appendChild(loadButton);
+
+  // --- Open file picker when fileButton clicked ---
+  fileButton.onclick = function() {
+    input.click();
+  };
 
   // texture loader for the inset image
   const loader = new THREE.TextureLoader();
   var insetMesh = null;
 
-  // --- Example action for button ---
-  button.onclick = function() {
+  // --- action for button ---
+  loadButton.onclick = function() {
     loader.load('k_cut_min_2.bmp', function(texture) {
       var image = texture.image;
       applyInset(image);
