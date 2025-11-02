@@ -68,7 +68,7 @@
   var radialSegments = 64;  // smooth edge
 
   var geom = new THREE.CylinderGeometry(radius, radius, thickness, radialSegments, 1, false);
-  var mat  = new THREE.MeshPhongMaterial({ color: 0x47008E, shininess: 80 });
+  var mat  = new THREE.MeshPhongMaterial({ color: 0x33125f, shininess: 80 });
   var disk = new THREE.Mesh(geom, mat);
 
   disk.position.set(0, 0, 0);   // raise height here
@@ -398,6 +398,7 @@
         targetWidth = 2.65;
         targetHeight = 2.75;
       }
+      if (char == 'M')  targetWidth = 2.55;
 
       var x_adj = 0;
       var z_adj = 0;
