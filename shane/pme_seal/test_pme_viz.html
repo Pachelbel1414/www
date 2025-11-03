@@ -44,7 +44,7 @@
   });
 
   var goldMaterial2 = new THREE.MeshPhongMaterial({
-    color: 0x8e7a05,
+    color: 0x7f6e05,
     //color: 0xffd700,
     shininess: 50,
     specular: 0xffffff
@@ -68,7 +68,7 @@
   var radialSegments = 64;  // smooth edge
 
   var geom = new THREE.CylinderGeometry(radius, radius, thickness, radialSegments, 1, false);
-  var mat  = new THREE.MeshPhongMaterial({ color: 0x33125f, shininess: 80 });
+  var mat  = new THREE.MeshPhongMaterial({ color: 0x240d4b, shininess: 30 });
   var disk = new THREE.Mesh(geom, mat);
 
   disk.position.set(0, 0, 0);   // raise height here
@@ -164,7 +164,7 @@
 
       // rotate so it faces outward
       mesh.rotation.x = -Math.PI / 2; // keep flat
-      mesh.rotation.z = -angle_r;
+      mesh.rotation.z = -angle_r - (angle_d * Math.PI / 180.0 / 2);
 
       scene.add(mesh);
     }
