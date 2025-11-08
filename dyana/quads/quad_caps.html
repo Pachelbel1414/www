@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Grid Cards — New Basis (Drag, Odd-Sum Rule, Quad-Safe)</title>
+<title>Quad Cap Layouts</title>
 <style>
   :root{
     --bg:#fafafa; --ink:#111; --muted:#6b7280; --border:#e5e7eb; --card:#fff;
@@ -14,13 +14,13 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  .app{max-width:1200px;margin:0 auto;padding:16px}
+  .app{max-width:1400px;margin:0 auto;padding:16px}
   h1{margin:0 0 8px 0;font-size:20px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:10px 0}
   label{font-weight:600}
   select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff}
   .toggle{display:inline-flex;align-items:center;gap:8px;font-weight:700;background:#eef2ff;border:1px solid #e0e7ff;border-radius:999px;padding:6px 10px}
-  button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:600}
+  button{padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:600}
   button:hover{background:#f3f4f6}
   .grid{
     display:grid;
@@ -97,15 +97,15 @@
   .controls-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 
   /* Top toolbar layout */
-  .toolbar{
+  .toolbar{justify-content:flex-start; 
     position: static;
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     margin: 8px auto 10px;
-    max-width: 1200px;
+    max-width: 1400px;
   }
   .toolbar .group{
     display: flex;
@@ -118,12 +118,124 @@
   .toolbar .right{ margin-left: auto; }
   #grid{ margin-top: 6px; }
 
+
+
+/* Enhanced highlight for Targeted Random selections */
+@keyframes pulseCyan {
+  0% { box-shadow: 0 0 0 0 rgba(6,182,212,0.8); }
+  70% { box-shadow: 0 0 0 6px rgba(6,182,212,0); }
+  100% { box-shadow: 0 0 0 0 rgba(6,182,212,0); }
+}
+.tgt-pick {
+  outline: 3px solid #06b6d4 !important;
+  animation: pulseCyan 1.2s infinite;
+  position: relative;
+}
+.tgt-pick::after {
+  content: "★";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-weight: 700;
+  font-family: ui-monospace,Menlo,Consolas,monospace;
+  background: #cffafe;
+  color: #0e7490;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.tgt-pick { box-shadow: inset 0 0 0 3px #0ea5e9 !important; position: relative; }
+.tgt-pick::after { content: "★"; position: absolute; right:6px; bottom:6px; font-weight:700; font-family: ui-monospace,Menlo,Consolas,monospace; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:6px; }
+
+
+/* Toolbar pill groups (re-styled) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: #f5f7fb;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03) inset;
+}
+.pill .group { margin: 0; }
+.pill input[type="number"] { width: 68px; }
+.pill + .pill { margin-left: 10px; }
+
+
+/* Toolbar pill groups - warm cream/yellow theme */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #fff9ec 0%, #fff3da 100%);
+  border: 1px solid #f3cc63;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 2px 6px rgba(243, 204, 99, 0.15);
+}
+.pill .group { margin: 0; }
+.pill input[type="number"],
+.pill input[type="text"] { 
+  background: #fffef8; 
+  border: 1px solid #ead39a; 
+  padding: 4px 8px; 
+  border-radius: 8px;
+}
+.pill + .pill { margin-left: 12px; }
+
+
+/* Toolbar pill groups - pale blue theme */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #f2f7ff 0%, #e8f1ff 100%);
+  border: 1px solid #bcd6ff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 2px 6px rgba(103, 149, 255, 0.12);
+}
+.pill .group { margin: 0; }
+.pill input[type="number"],
+.pill input[type="text"] {
+  background: #ffffff;
+  border: 1px solid #cfe0ff;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+/* Buttons not inside a pill: subtle pale blue highlight */
+.toolbar > button,
+.toolbar > .group > button {
+  background: #f2f7ff;
+  border: 1px solid #cfe0ff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+}
+/* Keep pill-contained buttons neutral so the pill itself provides emphasis */
+.pill button { background: #ffffff; border-color: #d9e6ff; }
+
+/* Spacing between pills */
+.pill + .pill { margin-left: 12px; }
+
+
+/* Align bottom toggle with header rows */
+#controls .toggle { display:inline-flex; align-items:center; gap:8px; }
+#controls .toggle.right { float:none; }
+
 </style>
 </head>
 <body>
   <div class="app" id="appRoot">
-    <h1>Grid Cards — New Basis</h1>
+    <h1>Quad Cap Layouts</h1>
     <div id="controls"><div id="topControls" class="toolbar">
+<div class="pill"><div class="group" id="liveCounts" style="margin-left:0;">
+  <span class="muted">Red slots: <b id="redCount">0</b></span>
+  <span class="muted" style="margin-left:10px;">Face‑up: <b id="faceCount">0</b></span>
+</div>
+
   <!-- Group 1: deck & quick toggles -->
   <div class="group">
     <label>Deck size:
@@ -141,35 +253,40 @@
       <input type="checkbox" id="binaryToggle">
       <span>Show binary numbers</span>
     </label>
+  <label class="toggle">
+    <input type="checkbox" id="editToggle" checked>
+    <span>Allow adding/removing cards</span>
+  </label>
 
     <button id="clearCardsBtn">Clear Current Cards</button>
     <button id="revealRedBtn">Turn Red Locations Face Up</button>
   </div><span id="posCount" style="display:none">0</span></div>
 
-  <!-- Group 2: basis actions -->
+  </div><!-- Group 2: basis actions -->
   <div class="group">
     <button id="newBasisBtn">Create New Basis</button>
     <button id="randomBasisBtn">Random Basis</button>
+    <div class="pill"><input id="targetedInput" type="text" style="width:220px; margin-right:6px;" placeholder="targets (e.g., 10, 23, 57)"><button id="targetedRandomBtn" title="Enter non-red slots (comma separated), then find a random basis that sends leftovers there">Find Targeted Random</button></div>
+    
+    <span id="targetedHint" class="muted" style="display:none;">Pick non-red slots (max <b id="tgtK">k</b>). Then click <b>Targeted Random</b> again to search.</span>
     <button id="returnStdBtn">Return to Standard Locations</button>
   </div>
 
   <!-- Group 3: analyze & bases listing -->
   <div class="group">
     <button id="analyzeBtn" title="Click to toggle Analyze mode">Analyze Card</button>
-    <button id="countBasesBtn" title="Count the valid bases">Count Bases</button>
+    <div class="pill"><button id="countBasesBtn" title="Count the valid bases">Count Bases</button>
     <label class="inline">
       <span>List first</span>
       <input id="listNInput" type="number" min="1" value="50" style="width:64px;">
     </label>
-    <button id="listBasesOnScreenBtn">List on screen</button>
-    <button id="listBasesCsvBtn">Export CSV</button>
+    <button id="listBasesOnScreenBtn">List on screen</button> <button id="listBasesCsvBtn">Export CSV</button></div>
+        <div class="pill"><button id="listTargetedBtn" title="List only bases that satisfy current targets">List Targeted Bases</button> <button id="countTargetedBtn" title="Count unique targeted bases (deduped sets)">Count Targeted Bases</button></div></div></div>
+    
   </div>
 
   <!-- Edit toggle on the right -->
-  <label class="toggle right">
-    <input type="checkbox" id="editToggle" checked>
-    <span>Allow adding/removing cards</span>
-  </label>
+  
 
   <!-- Analyze hint (shown only in analyze mode) -->
   <span id="analyzeHint" class="muted" style="display:none;">Analyze: click a face-up card on the grid.</span>
@@ -330,9 +447,11 @@ editEnabled = !!on;
     applyColumns();
     for(let p=0;p<DECK;p++) grid.appendChild(makeCell(p));
     layoutToFit();
+    updateLiveCounts();
     updateLocks();
     updateClearButtonState();
     updateButtonStates();
+    updateLiveCounts();
   }
 
   function toggleCard(pos){
@@ -377,6 +496,7 @@ editEnabled = !!on;
     updateLocks();
     updateClearButtonState();
     updateButtonStates();
+    updateLiveCounts();
   }
 
   function xor3Counts(values){
@@ -633,6 +753,7 @@ editEnabled = !!on;
     updateLocks();
     updateClearButtonState();
     updateButtonStates();
+    updateLiveCounts();
   }
 
   // Return to standard locations
@@ -672,6 +793,7 @@ editEnabled = !!on;
     updateButtonStates();
     updateClearButtonState();
     updateButtonStates();
+    updateLiveCounts();
   }
 
   // Clear current cards: turn all facedown and clear locks
@@ -687,6 +809,7 @@ editEnabled = !!on;
     updateLocks();
     updateClearButtonState();
   updateButtonStates();
+    updateLiveCounts();
   }
   // Randomly assign pile cards to unfilled basis targets (basis mode only)
   function randomBasis(){
@@ -911,7 +1034,9 @@ editEnabled = !!on;
   updateClearButtonState();
   updateButtonStates();
   updateButtonStates();
-  updateClearButtonState(); });
+  updateClearButtonState();
+  updateLiveCounts();
+  updateLiveCounts(); });
   document.getElementById('editToggle').addEventListener('change', e => setEditEnabled(e.target.checked));
   setEditEnabled(true);
 
@@ -960,6 +1085,19 @@ editEnabled = !!on;
   const basesMeta = document.getElementById('basesMeta');
 
   function basisSizeNeeded(){ return 1 + bitsForDeck(DECK); } // 0 plus unit vectors
+
+  // Live counters in toolbar
+  const redCountEl = document.getElementById('redCount');
+  const faceCountEl = document.getElementById('faceCount');
+  function updateLiveCounts(){
+    try{
+      const reds = basisSizeNeeded(); // number of red slots
+      const faceups = faceUpPositions.size;
+      if(redCountEl) redCountEl.textContent = String(reds);
+      if(faceCountEl) faceCountEl.textContent = String(faceups);
+    }catch(e){ /* noop */ }
+  }
+
 
   function currentFaceUpValues(){
     const arr = [];
@@ -1074,7 +1212,514 @@ editEnabled = !!on;
     downloadCSV(solutions, need);
   });
 
+  
+  
+  // ===== Targeted Random Basis (input-driven) =====
+  const targetedBtn = document.getElementById('targetedRandomBtn');
+  const targetedInput = document.getElementById('targetedInput');
+  const targetedClearBtn = document.getElementById('targetedClearBtn');
+  const targetedHint = document.getElementById('targetedHint');
+  const tgtKEl = document.getElementById('tgtK');
+
+  function isBasisPos(p){ return popcount(p) <= 1; }
+  function redPositionsArray(){
+    const arr = [];
+    for (let i=0;i<cells.length;i++){
+      const c = cells[i];
+      if(c && isBasisPos(c.pos) && c.pos < DECK) arr.push(c.pos);
+    }
+    // fallback if cells[] isn't full: compute powers of two + 0 under DECK
+    if(!arr.length){
+      const base=[0,1,2,4,8,16,32,64,128,256,512,1024];
+      return base.filter(p=>p<DECK);
+    }
+    return arr;
+  }
+  function currentFaceUpValuesArray(){
+    const arr = [];
+    if (window.faceUpPositions){
+      faceUpPositions.forEach(p => { const c = cells[p]; if(c && c.faceup) arr.push(c.value); });
+    } else {
+      // fallback: scan cells
+      for (let i=0;i<cells.length;i++){ const c = cells[i]; if(c && c.faceup) arr.push(c.value); }
+    }
+    return arr;
+  }
+  function tgtMaxK(){
+    return Math.max(0, currentFaceUpValuesArray().length - redPositionsArray().length);
+  }
+  function updateTgtK(){
+    if(tgtKEl) tgtKEl.textContent = String(tgtMaxK());
+  }
+  updateTgtK();
+
+  const targetedStatus = document.getElementById('targetedStatus');
+  function setStatus(txt){ if(targetedStatus){ targetedStatus.textContent = txt; } }
+  function clearStatus(){ setStatus(''); }
+
+
+  function parseTargets(){
+    const txt = (targetedInput && targetedInput.value || '').trim();
+    if(!txt) return new Set();
+    const parts = txt.split(/[, ]+/).map(s=>Number(s)).filter(n=>Number.isFinite(n));
+    const pruned = new Set();
+    for(const p of parts){
+      if(p>=0 && p<DECK && !isBasisPos(p)) pruned.add(p);
+    }
+    return pruned;
+  }
+
+  function tryRandomBasisAssignment(){
+    const reds = redPositionsArray();
+    const U = currentFaceUpValuesArray();
+    if(U.length < reds.length) return null;
+    function shuffle(a){
+      const arr=a.slice();
+      for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
+      return arr;
+    }
+    const order = reds.slice().sort((a,b)=>a-b);
+    const vals = shuffle(U);
+    const basisMap = new Map();
+    const placed = [];
+    function disabledSetFrom(valsPlaced){ return oddXorSetGT3(valsPlaced.slice()); }
+    let idx=0;
+    for(const pos of order){
+      let placedThis=false;
+      for(let t=0;t<vals.length;t++){
+        const v = vals[(idx+t)%vals.length];
+        if(basisMapHasValue(basisMap,v)) continue;
+        const dis = disabledSetFrom(placed);
+        if(dis.has(v)) continue;
+        basisMap.set(pos,v);
+        placed.push(v);
+        idx=(idx+t+1)%vals.length;
+        placedThis=true; break;
+      }
+      if(!placedThis) return null;
+    }
+    return basisMap;
+    function basisMapHasValue(map,v){ for(const vv of map.values()){ if(vv===v) return true; } return false; }
+  }
+
+  function valueFromBasisAtPos(basisMap, p){
+    const zeroVal = basisMap.get(0);
+    const ones = [];
+    basisMap.forEach((v, pos)=>{ if(pos!==0) ones.push(pos); });
+    let acc=0, used=0;
+    for(const bp of ones){ if((p & bp)!==0){ acc ^= basisMap.get(bp); used++; } }
+    if(used % 2 === 0 && zeroVal !== undefined){ acc ^= zeroVal; used++; }
+    return acc;
+  }
+
+  // Check if the multiset of leftover values can cover the values required at the chosen target positions.
+  function targetsSatisfied(basisMap, targets){
+    // Count leftover values (face-up not used as basis)
+    const U = currentFaceUpValuesArray();
+    const basisVals = new Set(Array.from(basisMap.values()));
+    const leftoverVals = U.filter(v => !basisVals.has(v));
+    const Lcount = new Map();
+    leftoverVals.forEach(v => Lcount.set(v, (Lcount.get(v)||0)+1));
+
+    // Count needs for target positions by layout value
+    const need = new Map();
+    targets.forEach(p => {
+      const v = valueFromBasisAtPos(basisMap, p);
+      need.set(v, (need.get(v)||0)+1);
+    });
+
+    // Every needed value must be available in leftover multiset
+    for (const [v, cnt] of need.entries()){
+      if ((Lcount.get(v)||0) < cnt) return false;
+    }
+    return true;
+  }
+
+  // Exact match on positions (use when targets count equals k)
+  function targetsExactPositions(basisMap, targets){
+    const leftovers = leftoversPositionsFor(basisMap);
+    if(leftovers.size !== targets.size) return false;
+    for(const p of targets){ if(!leftovers.has(p)) return false; }
+    return true;
+  }
+
+  function leftoversPositionsFor(basisMap){
+    const reds = redPositionsArray();
+    const U = currentFaceUpValuesArray();
+    const basisVals = new Set(Array.from(basisMap.values()));
+    const leftoverVals = U.filter(v => !basisVals.has(v));
+    const valueToPos = new Map();
+    for(let p=0;p<DECK;p++){ valueToPos.set(valueFromBasisAtPos(basisMap,p), p); }
+    const positions = [];
+    leftoverVals.forEach(v => {
+      const pos = valueToPos.get(v);
+      if(pos !== undefined && !isBasisPos(pos)) positions.push(pos);
+    });
+    return new Set(positions);
+  }
+
+  // Try to nudge a random basis toward hitting the targets by swapping basis values
+  function hillClimbTowardTargets(basisMap, targets, steps){
+    if(!basisMap || !targets || !targets.size) return basisMap;
+    const reds = Array.from(basisMap.keys()).sort((a,b)=>a-b);
+    const vals = Array.from(basisMap.values());
+    function score(map){
+      const left = leftoversPositionsFor(map);
+      let s = 0; targets.forEach(p => { if(left.has(p)) s++; });
+      return s;
+    }
+    let best = new Map(basisMap);
+    let bestS = score(best);
+    if(bestS === targets.size) return best;
+    for(let it=0; it<steps; it++){
+      // swap two random positions in the basis
+      const i = Math.floor(Math.random()*reds.length);
+      const j = Math.floor(Math.random()*reds.length);
+      if(i===j) continue;
+      const r1 = reds[i], r2 = reds[j];
+      const v1 = best.get(r1), v2 = best.get(r2);
+      const trial = new Map(best);
+      trial.set(r1, v2); trial.set(r2, v1);
+      // respect odd-sum rule by rejecting if disabled
+      const placed = reds.map(r => trial.get(r));
+      const dis = oddXorSetGT3(placed);
+      if(dis.has(v1) || dis.has(v2)) continue;
+      const sc = score(trial);
+      if(sc >= bestS){
+        best = trial; bestS = sc;
+        if(bestS === targets.size) break;
+      }
+    }
+    return bestS === targets.size ? best : null;
+  }
+
+  function applyBasisSolutionMap(basisMap){
+    if(!basisMap) return;
+    if(!basisMode) enterBasisMode();
+    const originalPileValues = Array.from(pile.querySelectorAll('.draggable')).map(n=>parseInt(n.id.replace('pile-',''),10));
+    basisAssignments.clear();
+    chipPlacedValues.clear();
+    basisMap.forEach((val,pos)=>{
+      const cellObj = cells[pos];
+      basisAssignments.set(pos,val);
+      chipPlacedValues.add(val);
+      if(cellObj) attachChip(cellObj, val);
+      const n = document.getElementById('pile-'+val); if(n) n.remove();
+    });
+    finishBasis(originalPileValues);
+  }
+
+  targetedBtn.addEventListener('click', function(){
+    const reds = redPositionsArray();
+    const U = currentFaceUpValuesArray();
+    const kmax = tgtMaxK();
+    const currentK = Math.max(0, currentFaceUpValuesArray().length - redPositionsArray().length);
+    updateTgtK();
+
+    if(U.length < reds.length){
+      if(targetedHint) targetedHint.innerHTML = 'Not enough face-up cards to form a basis.';
+      return;
+    }
+    const targets = parseTargets();
+    clearStatus(); setStatus('Searching…');
+    if(!targets.size){
+      if(targetedHint) targetedHint.innerHTML = 'Enter non-red target positions (comma separated).';
+      return;
+    }
+    if(targets.size > kmax){
+      if(targetedHint) targetedHint.innerHTML = 'You can target at most <b>'+kmax+'</b> positions with the current face-up set.';
+      return;
+    }
+
+    const MAX_TRIES = 150000;
+    let found=null;
+    for(let tries=0; tries<MAX_TRIES; tries++){
+      const basisMap = tryRandomBasisAssignment();
+      if(!basisMap) continue;
+      const exactNeeded = (targets.size === currentK);
+      const ok = exactNeeded ? targetsExactPositions(basisMap, targets) : targetsSatisfied(basisMap, targets);
+      if(ok){ found=basisMap; break; }
+    }
+    if(!found){
+      // hill-climb fallback attempts
+      for(let hc=0; hc<50 && !found; hc++){
+        const seed = tryRandomBasisAssignment();
+        if(!seed) continue;
+        const improved = hillClimbTowardTargets(seed, targets, 200);
+        const exactNeeded = (targets.size === currentK);
+        if(improved && (exactNeeded ? targetsExactPositions(improved, targets) : targetsSatisfied(improved, targets))){ found = improved; break; }
+      }
+    }
+    if(found){
+      if(targetedHint) targetedHint.innerHTML = '';
+      setStatus('Found and applied a matching basis.');
+      applyBasisSolutionMap(found);
+    }else{
+      setStatus('No matching basis found after '+MAX_TRIES+' random attempts + local search.');
+      if(targetedHint) targetedHint.innerHTML = 'Try different targets, or flip more cards.';
+    }
+  });
+
+  if(targetedClearBtn){
+    targetedClearBtn.addEventListener('click', function(){
+      if(targetedInput) targetedInput.value = '';
+      if(targetedHint) targetedHint.innerHTML = '';
+      updateTgtK();
+    });
+  }
+  // ===== end Targeted Random (input) =====
+
+  
+  // ===== List Targeted Bases (ordered by location; show leftover→target mapping) =====
+  const listTargetedBtn = document.getElementById('listTargetedBtn');
+  function redPositionsSorted(){
+    const R = [0,1,2,4,8,16,32,64,128,256,512,1024].filter(p => p < DECK);
+    return R;
+  }
+  function faceUpValuesUnique(){
+    // unique values among currently face-up cards
+    const vals = [];
+    if(window.faceUpPositions && faceUpPositions.size){
+      faceUpPositions.forEach(p => { const c = cells[p]; if(c && c.faceup) vals.push(c.value); });
+    }else{
+      for (let i=0;i<cells.length;i++){ const c = cells[i]; if(c && c.faceup) vals.push(c.value); }
+    }
+    vals.sort((a,b)=>a-b);
+    const out=[], seen=new Set();
+    for(const v of vals){ if(!seen.has(v)){ seen.add(v); out.push(v); } }
+    return out;
+  }
+  function parseTargetsInput(){
+    const targetedInput = document.getElementById('targetedInput');
+    if(!targetedInput) return new Set();
+    const txt = (targetedInput.value || '').trim();
+    if(!txt) return new Set();
+    const parts = txt.split(/[, ]+/).map(s=>Number(s)).filter(n=>Number.isFinite(n));
+    const set = new Set();
+    for(const p of parts){ if(p>=0 && p<DECK && popcount(p)>1) set.add(p); } // only non-red
+    return set;
+  }
+  function targetedExactNeeded(){
+    const k = Math.max(0, faceUpValuesUnique().length - redPositionsSorted().length);
+    const T = parseTargetsInput();
+    return T.size === k;
+  }
+  function enumerateTargetedBases(maxToCollect){
+    const reds = redPositionsSorted();
+    const U = faceUpValuesUnique();
+    const T = parseTargetsInput();
+    const exact = targetedExactNeeded();
+
+    const out = [];
+    if (U.length < reds.length || T.size === 0) return out;
+
+    // backtracking assign values to red positions
+    const used = new Set();
+    const basisMap = new Map();
+    const order = reds.slice(); // already sorted ascending
+
+    function consistentSoFar(){
+      // prune with odd-XOR rule
+      const vals = Array.from(basisMap.values());
+      const bad = oddXorSetGT3(vals);
+      if(vals.some(v => bad.has(v))) return false;
+
+      // If enough info to evaluate some targets, we could prune early, but keep simple
+      return true;
+    }
+
+    function acceptSolution(map){
+      // Check target satisfaction
+      if (exact){
+        if (!targetsExactPositions(map, T)) return false;
+      }else{
+        if (!targetsSatisfied(map, T)) return false;
+      }
+      return true;
+    }
+
+    function dfs(i){
+      if(out.length >= maxToCollect) return;
+      if(i === order.length){
+        if(acceptSolution(basisMap)){
+          out.push(new Map(basisMap));
+        }
+        return;
+      }
+      const pos = order[i];
+      for(const v of U){
+        if(used.has(v)) continue;
+        basisMap.set(pos, v);
+        if(consistentSoFar()){
+          used.add(v);
+          dfs(i+1);
+          used.delete(v);
+        }
+        basisMap.delete(pos);
+        if(out.length >= maxToCollect) return;
+      }
+    }
+    dfs(0);
+    return out;
+  }
+
+  function renderTargetedBases(list){
+    if(!basesPanel) return;
+    basesPanel.style.display = 'block';
+    const reds = redPositionsSorted();
+    const targets = Array.from(parseTargetsInput()).sort((a,b)=>a-b);
+    const showN = list.length;
+    basesMeta.textContent = 'Targeted Bases — showing ' + showN + ' unique' + (targets.length ? ('  |  targets: ' + targets.join(', ')) : '');
+
+    if(!showN){
+      basesResults.innerHTML = '<div>No targeted bases found for the current targets / face-up set.</div>';
+      return;
+    }
+
+    // Build HTML
+    let html = '<ol style="margin-top:6px">';
+    for(const map of list){
+      // basis values in order of red positions
+      const bvals = reds.map(r => labelFor(map.get(r)));
+      html += '<li>';
+      html += '<div><b>Basis (by red location order):</b> { ' + bvals.join(', ') + ' }</div>';
+
+      // leftovers mapping to targets
+      if(targets.length){
+        const rows = [];
+        for(const p of targets){
+          const v = valueFromBasisAtPos(map, p);
+          rows.push(p + ' \u2190 ' + labelFor(v)); // ←
+        }
+        html += '<div style="margin-top:2px;"><b>Leftovers \u2192 targets:</b> ' + rows.join(', ') + '</div>';
+      }
+      html += '</li>';
+    }
+    html += '</ol>';
+    basesResults.innerHTML = html;
+    try{ basesPanel.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(_){}
+  }
+
+  if(listTargetedBtn){
+    listTargetedBtn.addEventListener('click', function(){
+      const maxListInput = document.querySelector('#listFirst') || document.querySelector('input[type="number"][id*="list"]');
+      const limit = maxListInput ? Math.max(1, parseInt(maxListInput.value||'50',10)) : 100;
+
+      // Exhaustively generate ALL targeted bases, then dedupe by set-of-values
+      let allSols = enumerateTargetedBasesAll();
+      allSols = dedupeBasisList(allSols);
+
+      // Display only the first N for readability, but header shows that these are unique
+      const toShow = allSols.slice(0, limit);
+      renderTargetedBases(toShow);
+
+      // Also update header to reflect total unique count if more than shown
+      if (allSols.length > limit && typeof basesMeta !== 'undefined'){
+        basesMeta.textContent += ' (of ' + allSols.length + ' total unique)';
+      }
+    });
+  }
+  
+  // Helper: dedupe a list of basis Maps by the SET of values (slot order ignored)
+  function dedupeBasisList(list){
+    const seen = new Set();
+    const out = [];
+    for(const m of list){
+      const key = Array.from(m.values()).sort((a,b)=>a-b).join(',');
+      if(!seen.has(key)){ seen.add(key); out.push(m); }
+    }
+    return out;
+  }
+
+  // ===== end List Targeted Bases =====
+
+  // ===== Count Unique Targeted Bases =====
+  const countTargetedBtn = document.getElementById('countTargetedBtn');
+
+  function enumerateTargetedBasesAll(){
+    // Reuse DFS but without a max limit
+    const reds = redPositionsSorted();
+    const U = faceUpValuesUnique();
+    const T = parseTargetsInput();
+    const exact = targetedExactNeeded();
+
+    const out = [];
+    if (U.length < reds.length || T.size === 0) return out;
+
+    const used = new Set();
+    const basisMap = new Map();
+    const order = reds.slice();
+
+    function consistentSoFar(){
+      const vals = Array.from(basisMap.values());
+      const bad = oddXorSetGT3(vals);
+      if(vals.some(v => bad.has(v))) return false;
+      return true;
+    }
+    function acceptSolution(map){
+      if (exact){
+        if (!targetsExactPositions(map, T)) return false;
+      }else{
+        if (!targetsSatisfied(map, T)) return false;
+      }
+      return true;
+    }
+    function dfs(i){
+      if(i === order.length){
+        if(acceptSolution(basisMap)){
+          out.push(new Map(basisMap));
+        }
+        return;
+      }
+      const pos = order[i];
+      for(const v of U){
+        if(used.has(v)) continue;
+        basisMap.set(pos, v);
+        if(consistentSoFar()){
+          used.add(v);
+          dfs(i+1);
+          used.delete(v);
+        }
+        basisMap.delete(pos);
+      }
+    }
+    dfs(0);
+    return out;
+  }
+
+  function countUniqueTargetedBases(){
+    const sols = enumerateTargetedBasesAll();
+    // Deduplicate by the set of basis values (ignoring which red slot they occupy)
+    const seen = new Set();
+    for(const m of sols){
+      const key = Array.from(m.values()).sort((a,b)=>a-b).join(',');
+      seen.add(key);
+    }
+    return {unique: seen.size, total: sols.length};
+  }
+
+  if(countTargetedBtn){
+    countTargetedBtn.addEventListener('click', function(){
+      if(!basesPanel) return;
+      basesPanel.style.display = 'block';
+
+      // optional status
+      const statusEl = document.getElementById('targetedStatus');
+      if(statusEl) statusEl.textContent = 'Counting…';
+
+      const res = countUniqueTargetedBases();
+      basesMeta.textContent = 'Unique Targeted Bases: ' + res.unique + '  (raw matches: ' + res.total + ')';
+      basesResults.innerHTML = ''; // show just the count
+
+      if(statusEl) statusEl.textContent = '';
+      try{ basesPanel.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(_){}
+    });
+  }
+  // ===== end Count Unique Targeted Bases =====
+
+
   // Hide bases panel when deck changes
+
   document.getElementById('deck')?.addEventListener('change', ()=>{
     if(basesPanel) basesPanel.style.display = 'none';
     if(basesMeta) basesMeta.textContent = '';
